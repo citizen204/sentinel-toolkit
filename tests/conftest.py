@@ -24,3 +24,13 @@ def sample_findings():
             remediation="Add a Content-Security-Policy header.",
         ),
     ]
+
+
+@pytest.fixture
+def aws_credentials(monkeypatch):
+    """Fake AWS creds so boto3 never reaches a real account under moto."""
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
