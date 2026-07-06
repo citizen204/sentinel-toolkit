@@ -1,0 +1,56 @@
+import boto3
+from moto import mock_aws
+from sentinel.modules.cloudscan.checks.security_groups import (
+    check_open_security_groups,
+)
+
+
+def _make_sg(ec2, from_port, to_port, cidr):
+    vpc = ec2.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]["VpcId"]
+    sg = ec2.create_security_group(
+        GroupName=f"sg-{from_port}", Description="test", VpcId=vpc
+    )["GroupId"]
+    ec2.authorize_security_group_ingress(
+        GroupId=sg,
+        IpPermissions=[{
+            "IpProtocol": "tcp", "FromPort": from_port, "ToPort": to_port,
+            "IpRanges": [{"CidrIp": cidr}],
+        }],
+    )
+    return sg
+
+
+@mock_aws
+def test_ssh_open_to_world_is_flagged(aws_credentials):
+    session = boto3.Session(region_name="us-east-1")
+    ec2 = session.client("ec2")
+    sg = _make_sg(ec2, 22, 22, "0.0.0.0/0")
+
+    findings = check_open_security_groups(session)
+
+    match = [f for f in findings if f.resource == sg]
+    assert len(match) == 1
+    assert match[0].id == "CLOUD-SG-OPEN-INGRESS"
+    assert match[0].evidence["port"] == 22
+
+
+@mock_aws
+def test_restricted_cidr_is_not_flagged(aws_credentials):
+    session = boto3.Session(region_name="us-east-1")
+    ec2 = session.client("ec2")
+    sg = _make_sg(ec2, 22, 22, "203.0.113.0/24")
+
+    findings = check_open_security_groups(session)
+
+    assert all(f.resource != sg for f in findings)
+
+
+@mock_aws
+def test_open_but_non_risky_port_is_not_flagged(aws_credentials):
+    session = boto3.Session(region_name="us-east-1")
+    ec2 = session.client("ec2")
+    sg = _make_sg(ec2, 8080, 8080, "0.0.0.0/0")
+
+    findings = check_open_security_groups(session)
+
+    assert all(f.resource != sg for f in findings)
