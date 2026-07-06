@@ -1,0 +1,94 @@
+{
+  "generated_at": "2026-06-28T12:00:00+00:00",
+  "summary": { "Critical": 1, "High": 3, "Medium": 2, "Low": 2, "Info": 0 },
+  "findings": [
+    {
+      "id": "LOG-BRUTEFORCE",
+      "module": "logwatch",
+      "severity": "Critical",
+      "title": "Possible SSH brute-force attempt",
+      "description": "42 failed login attempts from 203.0.113.10.",
+      "remediation": "Block the source IP, enforce key-based auth, and deploy fail2ban.",
+      "evidence": { "ip": "203.0.113.10", "failed_attempts": 42 },
+      "resource": "203.0.113.10",
+      "timestamp": "2026-06-28T12:00:00+00:00"
+    },
+    {
+      "id": "CLOUD-S3-PUBLIC",
+      "module": "cloudscan",
+      "severity": "High",
+      "title": "Publicly accessible S3 bucket",
+      "description": "S3 bucket 'prod-backups' grants access to a public group (AllUsers).",
+      "remediation": "Remove public ACL grants and enable S3 Block Public Access.",
+      "evidence": { "bucket": "prod-backups", "acl": "public-read" },
+      "resource": "prod-backups",
+      "timestamp": "2026-06-28T12:00:00+00:00"
+    },
+    {
+      "id": "CLOUD-SG-OPEN-INGRESS",
+      "module": "cloudscan",
+      "severity": "High",
+      "title": "Security group open to the world on SSH",
+      "description": "Security group 'sg-0a1b2c' allows 0.0.0.0/0 inbound on port 22 (SSH).",
+      "remediation": "Restrict inbound SSH (port 22) to known IP ranges instead of 0.0.0.0/0.",
+      "evidence": { "group_id": "sg-0a1b2c", "port": 22, "cidr": "0.0.0.0/0" },
+      "resource": "sg-0a1b2c",
+      "timestamp": "2026-06-28T12:00:00+00:00"
+    },
+    {
+      "id": "NET-PORT-SCAN",
+      "module": "netmon",
+      "severity": "High",
+      "title": "Possible port scan",
+      "description": "198.51.100.23 connected to 27 distinct ports.",
+      "remediation": "Investigate the source host; block it if unauthorized.",
+      "evidence": { "src_ip": "198.51.100.23", "distinct_ports": 27 },
+      "resource": "198.51.100.23",
+      "timestamp": "2026-06-28T12:00:00+00:00"
+    },
+    {
+      "id": "CLOUD-IAM-NO-MFA",
+      "module": "cloudscan",
+      "severity": "Medium",
+      "title": "IAM user without MFA",
+      "description": "IAM user 'deploy-bot' has no MFA device enabled.",
+      "remediation": "Enable an MFA device for this IAM user.",
+      "evidence": { "user": "deploy-bot" },
+      "resource": "deploy-bot",
+      "timestamp": "2026-06-28T12:00:00+00:00"
+    },
+    {
+      "id": "LOG-ROOT-LOGIN",
+      "module": "logwatch",
+      "severity": "Medium",
+      "title": "Direct privileged login",
+      "description": "Successful 'root' login from 203.0.113.7.",
+      "remediation": "Disable direct root/admin SSH login; require sudo from named accounts.",
+      "evidence": { "account": "root", "ip": "203.0.113.7" },
+      "resource": "203.0.113.7",
+      "timestamp": "2026-06-28T12:00:00+00:00"
+    },
+    {
+      "id": "WEB-MISSING-HEADER",
+      "module": "webscan",
+      "severity": "Low",
+      "title": "Missing security header: Content-Security-Policy",
+      "description": "The response from https://app.example.com does not set the Content-Security-Policy header.",
+      "remediation": "Add a Content-Security-Policy header to mitigate XSS.",
+      "evidence": { "url": "https://app.example.com", "header": "Content-Security-Policy" },
+      "resource": "https://app.example.com",
+      "timestamp": "2026-06-28T12:00:00+00:00"
+    },
+    {
+      "id": "WEB-MISSING-HEADER",
+      "module": "webscan",
+      "severity": "Low",
+      "title": "Missing security header: X-Frame-Options",
+      "description": "The response from https://app.example.com does not set the X-Frame-Options header.",
+      "remediation": "Add 'X-Frame-Options: DENY' to prevent clickjacking.",
+      "evidence": { "url": "https://app.example.com", "header": "X-Frame-Options" },
+      "resource": "https://app.example.com",
+      "timestamp": "2026-06-28T12:00:00+00:00"
+    }
+  ]
+}
