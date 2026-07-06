@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from moto import mock_aws
 from typer.testing import CliRunner
 
 from sentinel.cli import app
@@ -27,7 +28,8 @@ def test_list_scanners_shows_registered():
     assert "clidemo" in result.stdout
 
 
-def test_scan_all_writes_reports_and_reports_count(tmp_path):
+@mock_aws
+def test_scan_all_writes_reports_and_reports_count(aws_credentials, tmp_path):
     result = runner.invoke(
         app, ["scan-all", "--output-dir", str(tmp_path), "--format", "both"]
     )
@@ -43,7 +45,8 @@ def test_scan_all_writes_reports_and_reports_count(tmp_path):
     assert "DEMO-1" in ids
 
 
-def test_scan_all_json_only(tmp_path):
+@mock_aws
+def test_scan_all_json_only(aws_credentials, tmp_path):
     result = runner.invoke(
         app, ["scan-all", "--output-dir", str(tmp_path), "--format", "json"]
     )

@@ -13,6 +13,14 @@ app = typer.Typer(
 )
 
 
+def _emit_reports(findings, output_dir: str, fmt: str) -> None:
+    if fmt in ("json", "both"):
+        typer.echo(f"JSON report: {report_mod.write_json(findings, output_dir)}")
+    if fmt in ("html", "both"):
+        typer.echo(f"HTML report: {report_mod.write_html(findings, output_dir)}")
+    typer.echo(f"Scan complete: {len(findings)} finding(s).")
+
+
 @app.command("list-scanners")
 def list_scanners() -> None:
     """List all registered scanner modules."""
@@ -35,13 +43,25 @@ def scan_all(
     findings = []
     for scanner_cls in all_scanners().values():
         findings.extend(scanner_cls().run(cfg))
+    _emit_reports(findings, output_dir, fmt)
 
-    if fmt in ("json", "both"):
-        typer.echo(f"JSON report: {report_mod.write_json(findings, output_dir)}")
-    if fmt in ("html", "both"):
-        typer.echo(f"HTML report: {report_mod.write_html(findings, output_dir)}")
 
-    typer.echo(f"Scan complete: {len(findings)} finding(s).")
+@app.command("scan")
+def scan(
+    name: str = typer.Argument(..., help="Scanner name (see list-scanners)."),
+    config: str = typer.Option(None, "--config", help="Path to YAML config file."),
+    fmt: str = typer.Option("both", "--format", help="json | html | both"),
+    output_dir: str = typer.Option("reports", "--output-dir", help="Report output dir."),
+) -> None:
+    """Run a single named scanner and write its report."""
+    scanners = all_scanners()
+    if name not in scanners:
+        available = ", ".join(sorted(scanners)) or "none"
+        typer.echo(f"Unknown scanner '{name}'. Available: {available}")
+        raise typer.Exit(code=1)
+    cfg = load_config(config)
+    findings = scanners[name]().run(cfg)
+    _emit_reports(findings, output_dir, fmt)
 
 
 def main() -> None:
