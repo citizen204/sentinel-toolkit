@@ -1,1 +1,1 @@
-# CloudScanner is exported once implemented in scanner.py (Task 4).
+from .scanner import CloudScanner  # noqa: F401
