@@ -32,9 +32,11 @@ scanner is just adding a `BaseScanner` subclass; the CLI discovers it automatica
 | Module | Domain | Checks |
 |--------|--------|--------|
 | `cloudscan` | AWS misconfiguration | Public S3 buckets · Security groups open to `0.0.0.0/0` on SSH/RDP · IAM users without MFA |
+| `logwatch` | Log analysis (SIEM-lite) | SSH brute-force detection · direct privileged (root/admin) logins |
+| `webscan` | Web application | Missing HTTP security headers (HSTS, CSP, X-Content-Type-Options, X-Frame-Options) |
+| `netmon` | Network traffic | Port-scan detection · host-sweep detection (from a flow log) |
 
-_Roadmap: `logwatch` (SIEM-lite log analysis), `webscan` (web vulnerability checks), `netmon`
-(network traffic monitoring), and a Next.js dashboard._
+Plus a **Next.js + Tailwind dashboard** (`dashboard/`) that visualises any `report.json`.
 
 ## Architecture
 
@@ -45,10 +47,15 @@ sentinel/
 │   ├─ scanner.py   # BaseScanner ABC + auto-registration registry
 │   ├─ config.py    # YAML config loader
 │   └─ report.py    # JSON + HTML report generation
-├─ modules/
-│   └─ cloudscan/   # AWS scanner (checks/ = one pure function per rule)
+├─ modules/         # each is a BaseScanner subclass (checks/ = one function per rule)
+│   ├─ cloudscan/   # AWS misconfiguration scanner
+│   ├─ logwatch/    # auth-log analysis
+│   ├─ webscan/     # HTTP security headers
+│   └─ netmon/      # network flow analysis
 ├─ templates/       # HTML report template
 └─ cli.py           # Typer CLI: list-scanners, scan <name>, scan-all
+
+dashboard/          # Next.js + Tailwind UI that renders a report.json
 ```
 
 Data flow:
@@ -93,13 +100,29 @@ Pass a YAML config with `--config`:
 
 ```yaml
 # sentinel.yaml
-aws_profile: my-audit-profile
+aws_profile: my-audit-profile          # cloudscan
+target_url: https://app.example.com    # webscan
+log_paths:                             # logwatch
+  - /var/log/auth.log
+capture_file: flows.txt                # netmon (src_ip dst_ip dst_port per line)
 output_dir: reports
 ```
 
 ```bash
 sentinel scan cloudscan --config sentinel.yaml
+sentinel scan-all --config sentinel.yaml
 ```
+
+### Dashboard
+
+```bash
+cd dashboard
+npm install
+npm run dev            # http://localhost:3000
+```
+
+The dashboard reads `dashboard/public/report.json`; drop a real report there to view your own
+findings. See [dashboard/README.md](dashboard/README.md).
 
 ## What `cloudscan` checks
 
@@ -122,7 +145,8 @@ All AWS interactions are mocked with `moto`; the test suite runs fully offline.
 
 ## Tech stack
 
-Python 3.11 · Pydantic · Typer · Jinja2 · boto3 · pytest · moto
+**Toolkit:** Python 3.11 · Pydantic · Typer · Jinja2 · boto3 · requests · pytest · moto · responses
+**Dashboard:** Next.js · React · Tailwind CSS · TypeScript
 
 ## License
 
