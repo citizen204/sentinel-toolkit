@@ -62,8 +62,8 @@ scanner.run() ─▶ list[Finding] ─▶ aggregate ─▶ report.json + report.
 Requires Python 3.11+.
 
 ```bash
-git clone <your-repo-url> sentinel
-cd sentinel
+git clone https://github.com/citizen204/sentinel-toolkit.git
+cd sentinel-toolkit
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
