@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sentinel Report</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; color: #1a1a1a; }
+    h1 { margin-bottom: 0.25rem; }
+    .meta { color: #666; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .summary span { display: inline-block; padding: 0.25rem 0.6rem; margin-right: 0.4rem;
+                    border-radius: 4px; font-size: 0.85rem; }
+    .Critical { background: #7f1d1d; color: #fff; }
+    .High { background: #b91c1c; color: #fff; }
+    .Medium { background: #d97706; color: #fff; }
+    .Low { background: #ca8a04; color: #fff; }
+    .Info { background: #2563eb; color: #fff; }
+    .finding { border-left: 4px solid #ccc; padding: 0.5rem 1rem; margin: 0.75rem 0;
+               background: #fafafa; }
+    .finding.Critical { border-color: #7f1d1d; }
+    .finding.High { border-color: #b91c1c; }
+    .finding.Medium { border-color: #d97706; }
+    .finding.Low { border-color: #ca8a04; }
+    .finding.Info { border-color: #2563eb; }
+    .rem { color: #065f46; font-size: 0.9rem; }
+    code { background: #eee; padding: 0 0.2rem; }
+  </style>
+</head>
+<body>
+  <h1>Sentinel Security Report</h1>
+  <div class="meta">Generated at {{ generated_at }}</div>
+  <div class="summary">
+    {% for sev, count in summary.items() %}
+      <span class="{{ sev }}">{{ sev }}: {{ count }}</span>
+    {% endfor %}
+  </div>
+  {% for f in findings %}
+    <div class="finding {{ f.severity.value }}">
+      <strong>[{{ f.severity.value }}] {{ f.title }}</strong>
+      <span style="color:#888">({{ f.module }} — {{ f.id }})</span>
+      <p>{{ f.description }}</p>
+      {% if f.resource %}<p>Resource: <code>{{ f.resource }}</code></p>{% endif %}
+      <p class="rem">Fix: {{ f.remediation }}</p>
+    </div>
+  {% endfor %}
+</body>
+</html>
