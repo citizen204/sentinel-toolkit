@@ -25,6 +25,10 @@ def check_users_without_mfa(session) -> list[Finding]:
                     title="IAM user without MFA",
                     description=f"IAM user '{username}' has no MFA device enabled.",
                     remediation="Enable an MFA device for this IAM user.",
+                    category="Access Control",
+                    references=[
+                        "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html"
+                    ],
                     evidence={"user": username},
                     resource=username,
                 )

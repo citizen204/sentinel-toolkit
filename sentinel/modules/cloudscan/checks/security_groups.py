@@ -49,6 +49,10 @@ def check_open_security_groups(session) -> list[Finding]:
                                 f"Restrict inbound {label} (port {port}) to known "
                                 f"IP ranges instead of 0.0.0.0/0."
                             ),
+                            category="Network Exposure",
+                            references=[
+                                "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html"
+                            ],
                             evidence={
                                 "group_id": group_id, "port": port,
                                 "cidr": "0.0.0.0/0",

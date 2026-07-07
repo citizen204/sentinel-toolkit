@@ -55,3 +55,16 @@ def test_model_dump_json_is_serializable():
     data = f.model_dump(mode="json")
     assert data["severity"] == "High"
     assert isinstance(data["timestamp"], str)
+
+
+def test_category_and_references_default_and_set():
+    f = Finding(**_valid_kwargs())
+    assert f.category is None
+    assert f.references == []
+
+    kwargs = _valid_kwargs()
+    kwargs["category"] = "Data Exposure"
+    kwargs["references"] = ["https://example.test/doc"]
+    f2 = Finding(**kwargs)
+    assert f2.category == "Data Exposure"
+    assert f2.references == ["https://example.test/doc"]

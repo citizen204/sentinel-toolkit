@@ -25,6 +25,8 @@ class Finding(BaseModel):
     title: str
     description: str
     remediation: str
+    category: str | None = None
+    references: list[str] = Field(default_factory=list)
     evidence: dict = Field(default_factory=dict)
     resource: str | None = None
     timestamp: datetime = Field(default_factory=_utcnow)
