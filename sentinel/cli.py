@@ -4,8 +4,35 @@ import typer
 
 from sentinel import modules  # noqa: F401  (imports register future scanners)
 from sentinel.core.config import load_config
+from sentinel.core.finding import Finding, Severity
 from sentinel.core.scanner import all_scanners
 from sentinel.core import report as report_mod
+
+
+def run_scanners(scanners, config) -> list[Finding]:
+    """Run each scanner, isolating failures.
+
+    If one scanner raises, the others still run and the failure is surfaced as an
+    INFO finding rather than crashing the whole scan.
+    """
+    findings: list[Finding] = []
+    for name, scanner_cls in scanners.items():
+        try:
+            findings.extend(scanner_cls().run(config))
+        except Exception as exc:  # noqa: BLE001 - intentionally isolate any scanner failure
+            findings.append(
+                Finding(
+                    id="SCANNER-ERROR",
+                    module=name,
+                    severity=Severity.INFO,
+                    title=f"Scanner '{name}' failed to run",
+                    description=f"{type(exc).__name__}: {exc}",
+                    remediation="Check this scanner's configuration and credentials.",
+                    evidence={"scanner": name, "error": str(exc)},
+                    resource=name,
+                )
+            )
+    return findings
 
 app = typer.Typer(
     help="Sentinel — a modular defensive security toolkit (authorized use only).",
@@ -38,11 +65,12 @@ def scan_all(
     fmt: str = typer.Option("both", "--format", help="json | html | both"),
     output_dir: str = typer.Option("reports", "--output-dir", help="Report output dir."),
 ) -> None:
-    """Run every registered scanner and write a consolidated report."""
+    """Run every registered scanner and write a consolidated report.
+
+    A failure in one scanner does not stop the others (see run_scanners).
+    """
     cfg = load_config(config)
-    findings = []
-    for scanner_cls in all_scanners().values():
-        findings.extend(scanner_cls().run(cfg))
+    findings = run_scanners(all_scanners(), cfg)
     _emit_reports(findings, output_dir, fmt)
 
 
