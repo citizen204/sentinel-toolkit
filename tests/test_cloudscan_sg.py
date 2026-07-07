@@ -54,3 +54,17 @@ def test_open_but_non_risky_port_is_not_flagged(aws_credentials):
     findings = check_open_security_groups(session)
 
     assert all(f.resource != sg for f in findings)
+
+
+@mock_aws
+def test_scans_multiple_regions(aws_credentials):
+    session = boto3.Session()
+    regions = ["us-east-1", "us-west-2"]
+    for region in regions:
+        ec2 = session.client("ec2", region_name=region)
+        _make_sg(ec2, 22, 22, "0.0.0.0/0")
+
+    findings = check_open_security_groups(session, regions)
+
+    assert len(findings) == 2
+    assert {f.evidence.get("region") for f in findings} == set(regions)

@@ -32,6 +32,8 @@ def check_bruteforce(lines, threshold: int = 5) -> list[Finding]:
                         "Block the source IP, enforce key-based auth, and deploy "
                         "fail2ban or an equivalent rate limiter."
                     ),
+                    category="Authentication",
+                    references=["https://attack.mitre.org/techniques/T1110/"],
                     evidence={"ip": ip, "failed_attempts": attempts},
                     resource=ip,
                 )
@@ -57,6 +59,8 @@ def check_root_login(lines) -> list[Finding]:
                         "Disable direct root/admin SSH login; require sudo from "
                         "named user accounts."
                     ),
+                    category="Access Control",
+                    references=["https://attack.mitre.org/techniques/T1078/"],
                     evidence={"account": account, "ip": ip},
                     resource=ip,
                 )

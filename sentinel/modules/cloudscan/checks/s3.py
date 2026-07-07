@@ -37,6 +37,10 @@ def check_public_buckets(session) -> list[Finding]:
                     remediation=(
                         "Remove public ACL grants and enable S3 Block Public Access."
                     ),
+                    category="Data Exposure",
+                    references=[
+                        "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
+                    ],
                     evidence={"bucket": name, "grants": grants},
                     resource=name,
                 )

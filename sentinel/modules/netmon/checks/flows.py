@@ -49,6 +49,8 @@ def check_port_scan(flows, threshold: int = 10) -> list[Finding]:
                     title="Possible port scan",
                     description=f"{src} connected to {len(ports)} distinct ports.",
                     remediation="Investigate the source host; block it if unauthorized.",
+                    category="Reconnaissance",
+                    references=["https://attack.mitre.org/techniques/T1046/"],
                     evidence={"src_ip": src, "distinct_ports": len(ports)},
                     resource=src,
                 )
@@ -73,6 +75,8 @@ def check_host_sweep(flows, threshold: int = 10) -> list[Finding]:
                     title="Possible host sweep",
                     description=f"{src} contacted {len(hosts)} distinct hosts.",
                     remediation="Investigate the source host for reconnaissance activity.",
+                    category="Reconnaissance",
+                    references=["https://attack.mitre.org/techniques/T1018/"],
                     evidence={"src_ip": src, "distinct_hosts": len(hosts)},
                     resource=src,
                 )

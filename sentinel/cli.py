@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from enum import Enum
+from pathlib import Path
+
 import typer
 
 from sentinel import modules  # noqa: F401  (imports register future scanners)
@@ -7,6 +10,14 @@ from sentinel.core.config import load_config
 from sentinel.core.finding import Finding, Severity
 from sentinel.core.scanner import all_scanners
 from sentinel.core import report as report_mod
+
+
+class OutputFormat(str, Enum):
+    json = "json"
+    html = "html"
+    both = "both"   # json + html
+    sarif = "sarif"
+    all = "all"     # json + html + sarif
 
 
 def run_scanners(scanners, config) -> list[Finding]:
@@ -48,11 +59,14 @@ app = typer.Typer(
 )
 
 
-def _emit_reports(findings, output_dir: str, fmt: str) -> None:
-    if fmt in ("json", "both"):
+def _emit_reports(findings, output_dir: str, fmt) -> None:
+    fmt = fmt.value if isinstance(fmt, OutputFormat) else fmt
+    if fmt in ("json", "both", "all"):
         typer.echo(f"JSON report: {report_mod.write_json(findings, output_dir)}")
-    if fmt in ("html", "both"):
+    if fmt in ("html", "both", "all"):
         typer.echo(f"HTML report: {report_mod.write_html(findings, output_dir)}")
+    if fmt in ("sarif", "all"):
+        typer.echo(f"SARIF report: {report_mod.write_sarif(findings, output_dir)}")
     typer.echo(f"Scan complete: {len(findings)} finding(s).")
 
 
@@ -67,18 +81,39 @@ def list_scanners() -> None:
         typer.echo(name)
 
 
+def _select_scanners(include: str | None, exclude: str | None) -> dict:
+    """Filter the registry by optional comma-separated --include/--exclude lists."""
+    scanners = all_scanners()
+    if include:
+        wanted = {n.strip() for n in include.split(",") if n.strip()}
+        scanners = {n: c for n, c in scanners.items() if n in wanted}
+    if exclude:
+        unwanted = {n.strip() for n in exclude.split(",") if n.strip()}
+        scanners = {n: c for n, c in scanners.items() if n not in unwanted}
+    return scanners
+
+
 @app.command("scan-all")
 def scan_all(
     config: str = typer.Option(None, "--config", help="Path to YAML config file."),
-    fmt: str = typer.Option("both", "--format", help="json | html | both"),
+    fmt: OutputFormat = typer.Option(
+        OutputFormat.both, "--format", help="json | html | both | sarif | all"
+    ),
     output_dir: str = typer.Option("reports", "--output-dir", help="Report output dir."),
+    include: str = typer.Option(
+        None, "--include", help="Only run these scanners (comma-separated)."
+    ),
+    exclude: str = typer.Option(
+        None, "--exclude", help="Skip these scanners (comma-separated), e.g. cloudscan."
+    ),
 ) -> None:
     """Run every registered scanner and write a consolidated report.
 
     A failure in one scanner does not stop the others (see run_scanners).
+    Use --include/--exclude to narrow which scanners run.
     """
     cfg = load_config(config)
-    findings = run_scanners(all_scanners(), cfg)
+    findings = run_scanners(_select_scanners(include, exclude), cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
     _emit_reports(findings, output_dir, fmt)
 
@@ -87,7 +122,9 @@ def scan_all(
 def scan(
     name: str = typer.Argument(..., help="Scanner name (see list-scanners)."),
     config: str = typer.Option(None, "--config", help="Path to YAML config file."),
-    fmt: str = typer.Option("both", "--format", help="json | html | both"),
+    fmt: OutputFormat = typer.Option(
+        OutputFormat.both, "--format", help="json | html | both | sarif | all"
+    ),
     output_dir: str = typer.Option("reports", "--output-dir", help="Report output dir."),
 ) -> None:
     """Run a single named scanner and write its report."""
@@ -100,6 +137,34 @@ def scan(
     findings = scanners[name]().run(cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
     _emit_reports(findings, output_dir, fmt)
+
+
+_SAMPLE_CONFIG = """\
+# Sentinel configuration — point each scanner at real targets.
+aws_profile: my-audit-profile          # cloudscan: AWS profile to audit
+aws_regions:                           # cloudscan: regions to scan (empty = default region)
+  - us-east-1
+target_url: https://app.example.com    # webscan: URL to check
+log_paths:                             # logwatch: auth logs to analyse
+  - /var/log/auth.log
+capture_file: capture.pcap             # netmon: a flow log or a .pcap/.pcapng
+ignore_ids: []                         # suppress accepted-risk findings by rule id
+output_dir: reports
+"""
+
+
+@app.command("init-config")
+def init_config(
+    path: str = typer.Option("sentinel.yaml", "--path", help="Where to write the config."),
+    force: bool = typer.Option(False, "--force", help="Overwrite if it already exists."),
+) -> None:
+    """Write a sample configuration file to get started."""
+    target = Path(path)
+    if target.exists() and not force:
+        typer.echo(f"{target} already exists. Use --force to overwrite.")
+        raise typer.Exit(code=1)
+    target.write_text(_SAMPLE_CONFIG, encoding="utf-8")
+    typer.echo(f"Wrote sample config to {target}")
 
 
 def main() -> None:

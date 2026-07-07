@@ -38,6 +38,8 @@ def check_security_headers(url: str, session=None, timeout: int = 10) -> list[Fi
                     title=f"Missing security header: {header}",
                     description=f"The response from {url} does not set the {header} header.",
                     remediation=remediation,
+                    category="Web Hardening",
+                    references=["https://owasp.org/www-project-secure-headers/"],
                     evidence={"url": url, "header": header},
                     resource=url,
                 )
