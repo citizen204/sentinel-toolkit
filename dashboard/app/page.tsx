@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Report, Severity } from "@/lib/types";
 import SummaryBar from "@/components/SummaryBar";
 import FindingCard from "@/components/FindingCard";
+import UploadReport from "@/components/UploadReport";
 
 const FILTERS: (Severity | "All")[] = [
   "All",
@@ -44,6 +45,15 @@ export default function Home() {
           Generated at {report.generated_at} · {report.findings.length} findings
         </p>
       )}
+
+      <div className="mt-6">
+        <UploadReport
+          onLoad={(r) => {
+            setReport(r);
+            setError(null);
+          }}
+        />
+      </div>
 
       {error && <p className="mt-6 text-red-600">{error}</p>}
 
