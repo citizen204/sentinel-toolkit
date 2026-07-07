@@ -13,7 +13,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "moto>=5.0"]
+dev = ["pytest>=8.0", "moto>=5.0", "scapy>=2.5"]
+capture = ["scapy>=2.5"]  # optional: live/pcap capture for netmon
 
 [project.scripts]
 sentinel = "sentinel.cli:main"
