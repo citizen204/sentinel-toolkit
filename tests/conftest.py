@@ -1,4 +1,5 @@
 import pytest
+
 from sentinel.core.finding import Finding, Severity
 
 

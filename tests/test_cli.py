@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
+
 from moto import mock_aws
 from typer.testing import CliRunner
 
 from sentinel.cli import app
-from sentinel.core.scanner import BaseScanner
 from sentinel.core.finding import Finding, Severity
+from sentinel.core.scanner import BaseScanner
 
 runner = CliRunner()
 

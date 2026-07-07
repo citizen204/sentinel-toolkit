@@ -6,10 +6,10 @@ from pathlib import Path
 import typer
 
 from sentinel import modules  # noqa: F401  (imports register future scanners)
+from sentinel.core import report as report_mod
 from sentinel.core.config import load_config
 from sentinel.core.finding import Finding, Severity
 from sentinel.core.scanner import all_scanners
-from sentinel.core import report as report_mod
 
 
 class OutputFormat(str, Enum):

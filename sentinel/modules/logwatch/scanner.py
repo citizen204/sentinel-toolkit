@@ -4,6 +4,7 @@ from pathlib import Path
 
 from sentinel.core.finding import Finding
 from sentinel.core.scanner import BaseScanner
+
 from .checks.auth import check_bruteforce, check_root_login
 
 

@@ -4,7 +4,8 @@ from pathlib import Path
 
 from sentinel.core.finding import Finding
 from sentinel.core.scanner import BaseScanner
-from .checks.flows import parse_flow_file, check_port_scan, check_host_sweep
+
+from .checks.flows import check_host_sweep, check_port_scan, parse_flow_file
 
 
 class NetmonScanner(BaseScanner):

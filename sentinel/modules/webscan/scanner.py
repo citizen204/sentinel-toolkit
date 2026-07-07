@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sentinel.core.finding import Finding
 from sentinel.core.scanner import BaseScanner
+
 from .checks.headers import check_security_headers
 
 

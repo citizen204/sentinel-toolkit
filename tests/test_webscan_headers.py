@@ -1,4 +1,5 @@
 import responses
+
 from sentinel.modules.webscan.checks.headers import check_security_headers
 
 URL = "https://example.test/"

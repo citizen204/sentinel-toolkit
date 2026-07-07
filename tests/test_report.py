@@ -1,5 +1,6 @@
 import json
-from sentinel.core.report import summarize, write_json, write_html, write_sarif
+
+from sentinel.core.report import summarize, write_html, write_json, write_sarif
 
 
 def test_summarize_counts_all_severities(sample_findings):

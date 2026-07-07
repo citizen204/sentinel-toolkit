@@ -1,7 +1,10 @@
-from sentinel.modules.netmon.checks.flows import (
-    Flow, check_port_scan, check_host_sweep, parse_flow_file,
-)
 from sentinel.core.finding import Severity
+from sentinel.modules.netmon.checks.flows import (
+    Flow,
+    check_host_sweep,
+    check_port_scan,
+    parse_flow_file,
+)
 
 
 def test_port_scan_flagged():

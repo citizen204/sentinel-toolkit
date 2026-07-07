@@ -6,7 +6,7 @@ import pytest
 from moto import mock_aws
 from typer.testing import CliRunner
 
-from sentinel.cli import app, _select_scanners
+from sentinel.cli import _select_scanners, app
 from sentinel.core.config import load_config
 
 runner = CliRunner()

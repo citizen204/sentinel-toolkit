@@ -1,7 +1,8 @@
 import boto3
 from moto import mock_aws
-from sentinel.core.scanner import all_scanners
+
 from sentinel.core.config import Config
+from sentinel.core.scanner import all_scanners
 
 
 def test_cloudscan_is_registered():

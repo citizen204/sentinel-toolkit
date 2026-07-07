@@ -1,7 +1,8 @@
 import boto3
 from moto import mock_aws
-from sentinel.modules.cloudscan.checks.s3 import check_public_buckets
+
 from sentinel.core.finding import Severity
+from sentinel.modules.cloudscan.checks.s3 import check_public_buckets
 
 
 @mock_aws

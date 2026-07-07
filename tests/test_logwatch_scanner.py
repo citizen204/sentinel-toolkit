@@ -1,5 +1,5 @@
-from sentinel.core.scanner import all_scanners
 from sentinel.core.config import Config
+from sentinel.core.scanner import all_scanners
 
 
 def test_logwatch_registered():

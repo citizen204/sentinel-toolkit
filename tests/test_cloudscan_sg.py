@@ -1,5 +1,6 @@
 import boto3
 from moto import mock_aws
+
 from sentinel.modules.cloudscan.checks.security_groups import (
     check_open_security_groups,
 )
