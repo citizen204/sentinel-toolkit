@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 class Config(BaseModel):
     aws_profile: str | None = None
+    aws_regions: list[str] = Field(default_factory=list)
     target_url: str | None = None
     log_paths: list[str] = Field(default_factory=list)
     capture_file: str | None = None

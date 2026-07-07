@@ -21,6 +21,6 @@ class CloudScanner(BaseScanner):
             session = boto3.Session()
         findings: list[Finding] = []
         findings.extend(check_public_buckets(session))
-        findings.extend(check_open_security_groups(session))
+        findings.extend(check_open_security_groups(session, config.aws_regions))
         findings.extend(check_users_without_mfa(session))
         return findings
