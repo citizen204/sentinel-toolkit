@@ -57,6 +57,27 @@ def test_open_but_non_risky_port_is_not_flagged(aws_credentials):
 
 
 @mock_aws
+def test_ipv6_open_to_world_is_flagged(aws_credentials):
+    session = boto3.Session(region_name="us-east-1")
+    ec2 = session.client("ec2")
+    vpc = ec2.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]["VpcId"]
+    sg = ec2.create_security_group(GroupName="v6", Description="d", VpcId=vpc)["GroupId"]
+    ec2.authorize_security_group_ingress(
+        GroupId=sg,
+        IpPermissions=[{
+            "IpProtocol": "tcp", "FromPort": 22, "ToPort": 22,
+            "Ipv6Ranges": [{"CidrIpv6": "::/0"}],
+        }],
+    )
+
+    findings = check_open_security_groups(session)
+
+    match = [f for f in findings if f.resource == sg]
+    assert len(match) == 1
+    assert "::/0" in match[0].evidence["cidr"]
+
+
+@mock_aws
 def test_scans_multiple_regions(aws_credentials):
     session = boto3.Session()
     regions = ["us-east-1", "us-west-2"]
