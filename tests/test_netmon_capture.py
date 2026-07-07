@@ -1,5 +1,5 @@
-from sentinel.modules.netmon.checks.flows import Flow
 from sentinel.modules.netmon.capture import flows_from_pcap
+from sentinel.modules.netmon.checks.flows import Flow
 
 
 def test_flows_from_pcap_extracts_tcp_and_udp(tmp_path):
@@ -22,7 +22,7 @@ def test_flows_from_pcap_extracts_tcp_and_udp(tmp_path):
 
 
 def test_flows_from_pcap_ignores_non_ip_packets(tmp_path):
-    from scapy.all import Ether, ARP, wrpcap
+    from scapy.all import ARP, Ether, wrpcap
 
     pcap = tmp_path / "arp.pcap"
     wrpcap(str(pcap), [Ether() / ARP()])

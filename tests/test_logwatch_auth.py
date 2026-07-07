@@ -1,5 +1,5 @@
-from sentinel.modules.logwatch.checks.auth import check_bruteforce, check_root_login
 from sentinel.core.finding import Severity
+from sentinel.modules.logwatch.checks.auth import check_bruteforce, check_root_login
 
 
 def _failed(ip):

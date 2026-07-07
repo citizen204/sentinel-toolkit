@@ -1,6 +1,8 @@
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 from pydantic import ValidationError
+
 from sentinel.core.finding import Finding, Severity
 
 

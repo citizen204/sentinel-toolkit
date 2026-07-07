@@ -6,10 +6,10 @@ from pathlib import Path
 import typer
 
 from sentinel import modules  # noqa: F401  (imports register future scanners)
+from sentinel.core import report as report_mod
 from sentinel.core.config import load_config
 from sentinel.core.finding import Finding, Severity
 from sentinel.core.scanner import all_scanners
-from sentinel.core import report as report_mod
 
 
 class OutputFormat(str, Enum):
@@ -81,14 +81,25 @@ def list_scanners() -> None:
         typer.echo(name)
 
 
+def _tokens(value: str | None) -> set[str]:
+    return {n.strip() for n in value.split(",") if n.strip()} if value else set()
+
+
 def _select_scanners(include: str | None, exclude: str | None) -> dict:
-    """Filter the registry by optional comma-separated --include/--exclude lists."""
+    """Filter the registry by --include/--exclude, rejecting unknown scanner names."""
     scanners = all_scanners()
+    known = set(scanners)
+    unknown = (_tokens(include) | _tokens(exclude)) - known
+    if unknown:
+        raise ValueError(
+            f"Unknown scanner(s): {', '.join(sorted(unknown))}. "
+            f"Available: {', '.join(sorted(known)) or 'none'}"
+        )
     if include:
-        wanted = {n.strip() for n in include.split(",") if n.strip()}
+        wanted = _tokens(include)
         scanners = {n: c for n, c in scanners.items() if n in wanted}
     if exclude:
-        unwanted = {n.strip() for n in exclude.split(",") if n.strip()}
+        unwanted = _tokens(exclude)
         scanners = {n: c for n, c in scanners.items() if n not in unwanted}
     return scanners
 
@@ -99,7 +110,9 @@ def scan_all(
     fmt: OutputFormat = typer.Option(
         OutputFormat.both, "--format", help="json | html | both | sarif | all"
     ),
-    output_dir: str = typer.Option("reports", "--output-dir", help="Report output dir."),
+    output_dir: str = typer.Option(
+        None, "--output-dir", help="Report output dir (default: config output_dir)."
+    ),
     include: str = typer.Option(
         None, "--include", help="Only run these scanners (comma-separated)."
     ),
@@ -113,9 +126,14 @@ def scan_all(
     Use --include/--exclude to narrow which scanners run.
     """
     cfg = load_config(config)
-    findings = run_scanners(_select_scanners(include, exclude), cfg)
+    try:
+        selected = _select_scanners(include, exclude)
+    except ValueError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
+    findings = run_scanners(selected, cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
-    _emit_reports(findings, output_dir, fmt)
+    _emit_reports(findings, output_dir or cfg.output_dir, fmt)
 
 
 @app.command("scan")
@@ -125,7 +143,9 @@ def scan(
     fmt: OutputFormat = typer.Option(
         OutputFormat.both, "--format", help="json | html | both | sarif | all"
     ),
-    output_dir: str = typer.Option("reports", "--output-dir", help="Report output dir."),
+    output_dir: str = typer.Option(
+        None, "--output-dir", help="Report output dir (default: config output_dir)."
+    ),
 ) -> None:
     """Run a single named scanner and write its report."""
     scanners = all_scanners()
@@ -136,7 +156,7 @@ def scan(
     cfg = load_config(config)
     findings = scanners[name]().run(cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
-    _emit_reports(findings, output_dir, fmt)
+    _emit_reports(findings, output_dir or cfg.output_dir, fmt)
 
 
 _SAMPLE_CONFIG = """\

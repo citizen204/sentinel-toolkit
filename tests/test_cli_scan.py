@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
+
 import boto3
 from moto import mock_aws
 from typer.testing import CliRunner
+
 from sentinel.cli import app
 
 runner = CliRunner()

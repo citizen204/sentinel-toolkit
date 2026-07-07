@@ -16,8 +16,14 @@ def _covers(perm: dict, port: int) -> bool:
     return from_port <= port <= to_port
 
 
-def _open_to_world(perm: dict) -> bool:
-    return any(rng.get("CidrIp") == "0.0.0.0/0" for rng in perm.get("IpRanges", []))
+def _world_open_cidrs(perm: dict) -> list[str]:
+    """Return the world-open CIDRs on this permission (IPv4 0.0.0.0/0, IPv6 ::/0)."""
+    cidrs: list[str] = []
+    if any(r.get("CidrIp") == "0.0.0.0/0" for r in perm.get("IpRanges", [])):
+        cidrs.append("0.0.0.0/0")
+    if any(r.get("CidrIpv6") == "::/0" for r in perm.get("Ipv6Ranges", [])):
+        cidrs.append("::/0")
+    return cidrs
 
 
 def _iter_security_groups(ec2):
@@ -30,12 +36,13 @@ def _scan_group(sg: dict, region: str | None) -> list[Finding]:
     group_id = sg["GroupId"]
     findings: list[Finding] = []
     for perm in sg.get("IpPermissions", []):
-        if not _open_to_world(perm):
+        open_cidrs = _world_open_cidrs(perm)
+        if not open_cidrs:
             continue
         for port, label in RISKY_PORTS.items():
             if not _covers(perm, port):
                 continue
-            evidence = {"group_id": group_id, "port": port, "cidr": "0.0.0.0/0"}
+            evidence = {"group_id": group_id, "port": port, "cidr": ", ".join(open_cidrs)}
             if region:
                 evidence["region"] = region
             findings.append(

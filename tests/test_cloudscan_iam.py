@@ -1,7 +1,8 @@
 import boto3
 from moto import mock_aws
-from sentinel.modules.cloudscan.checks.iam import check_users_without_mfa
+
 from sentinel.core.finding import Severity
+from sentinel.modules.cloudscan.checks.iam import check_users_without_mfa
 
 
 @mock_aws

@@ -1,5 +1,5 @@
-from sentinel.core.scanner import all_scanners
 from sentinel.core.config import Config
+from sentinel.core.scanner import all_scanners
 
 
 def test_netmon_registered():
@@ -28,6 +28,7 @@ def test_run_no_capture_returns_empty():
 
 def test_run_reads_pcap_capture(tmp_path):
     from scapy.all import IP, TCP, wrpcap
+
     from sentinel.modules.netmon.scanner import NetmonScanner
 
     pkts = [IP(src="10.0.0.5", dst="10.0.0.1") / TCP(dport=p) for p in range(1, 13)]

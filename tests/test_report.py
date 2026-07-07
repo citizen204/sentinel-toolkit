@@ -1,5 +1,6 @@
 import json
-from sentinel.core.report import summarize, write_json, write_html, write_sarif
+
+from sentinel.core.report import summarize, write_html, write_json, write_sarif
 
 
 def test_summarize_counts_all_severities(sample_findings):
@@ -33,6 +34,19 @@ def test_write_html_contains_summary_and_titles(sample_findings, tmp_path):
     assert "Brute-force login detected" in html
     assert "Critical" in html
     assert "Set the bucket ACL to private." in html
+
+
+def test_write_html_shows_category_and_references(tmp_path):
+    from sentinel.core.finding import Finding, Severity
+
+    f = Finding(
+        id="X", module="m", severity=Severity.HIGH, title="t",
+        description="d", remediation="r",
+        category="Data Exposure", references=["https://example.test/ref"],
+    )
+    html = write_html([f], tmp_path).read_text(encoding="utf-8")
+    assert "Data Exposure" in html
+    assert "https://example.test/ref" in html
 
 
 def test_write_json_empty_findings(tmp_path):
@@ -73,3 +87,15 @@ def test_write_sarif_empty(tmp_path):
     doc = json.loads(path.read_text(encoding="utf-8"))
     assert doc["runs"][0]["results"] == []
     assert doc["runs"][0]["tool"]["driver"]["rules"] == []
+
+
+def test_write_sarif_has_stable_fingerprints(sample_findings, tmp_path):
+    run1 = json.loads(write_sarif(sample_findings, tmp_path).read_text(encoding="utf-8"))
+    run2 = json.loads(write_sarif(sample_findings, tmp_path).read_text(encoding="utf-8"))
+
+    fps1 = [r["partialFingerprints"]["sentinelFingerprint/v1"] for r in run1["runs"][0]["results"]]
+    fps2 = [r["partialFingerprints"]["sentinelFingerprint/v1"] for r in run2["runs"][0]["results"]]
+
+    assert all(fps1)                 # every result carries a fingerprint
+    assert fps1 == fps2              # stable across runs of the same findings
+    assert len(set(fps1)) == len(fps1)  # distinct findings → distinct fingerprints

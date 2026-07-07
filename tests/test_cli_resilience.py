@@ -1,6 +1,6 @@
 from sentinel.cli import run_scanners
-from sentinel.core.scanner import BaseScanner
 from sentinel.core.finding import Finding, Severity
+from sentinel.core.scanner import BaseScanner
 
 
 class _GoodScanner(BaseScanner):

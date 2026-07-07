@@ -184,8 +184,9 @@ output_dir: reports
 pytest -q          # 70+ tests, fully offline
 ```
 
-Every push and pull request runs the suite on GitHub Actions (see the CI badge above). No test
-touches a real cloud account, host, or network.
+Every push and pull request runs on GitHub Actions (see the CI badge above): **pytest + `ruff`
+lint** for the toolkit and a **`npm run build`** job for the dashboard. No test touches a real
+cloud account, host, or network.
 
 ## 🗺️ Roadmap
 

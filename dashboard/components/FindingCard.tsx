@@ -20,6 +20,11 @@ export default function FindingCard({ finding }: { finding: Finding }) {
         <span className="text-xs text-slate-500">
           {finding.module} · {finding.id}
         </span>
+        {finding.category && (
+          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-600">
+            {finding.category}
+          </span>
+        )}
       </div>
       <p className="mt-2 text-sm text-slate-700">{finding.description}</p>
       {finding.resource && (
@@ -29,6 +34,19 @@ export default function FindingCard({ finding }: { finding: Finding }) {
         </p>
       )}
       <p className="mt-2 text-sm text-emerald-700">Fix: {finding.remediation}</p>
+      {finding.references && finding.references.length > 0 && (
+        <p className="mt-1 text-xs text-slate-500">
+          References:{" "}
+          {finding.references.map((ref, i) => (
+            <span key={ref}>
+              {i > 0 && ", "}
+              <a href={ref} className="text-blue-600 underline" target="_blank" rel="noreferrer">
+                {ref.replace(/^https?:\/\//, "")}
+              </a>
+            </span>
+          ))}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import responses
-from sentinel.core.scanner import all_scanners
+
 from sentinel.core.config import Config
+from sentinel.core.scanner import all_scanners
 
 URL = "https://example.test/"
 
