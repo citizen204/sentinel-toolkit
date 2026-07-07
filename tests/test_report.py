@@ -73,3 +73,15 @@ def test_write_sarif_empty(tmp_path):
     doc = json.loads(path.read_text(encoding="utf-8"))
     assert doc["runs"][0]["results"] == []
     assert doc["runs"][0]["tool"]["driver"]["rules"] == []
+
+
+def test_write_sarif_has_stable_fingerprints(sample_findings, tmp_path):
+    run1 = json.loads(write_sarif(sample_findings, tmp_path).read_text(encoding="utf-8"))
+    run2 = json.loads(write_sarif(sample_findings, tmp_path).read_text(encoding="utf-8"))
+
+    fps1 = [r["partialFingerprints"]["sentinelFingerprint/v1"] for r in run1["runs"][0]["results"]]
+    fps2 = [r["partialFingerprints"]["sentinelFingerprint/v1"] for r in run2["runs"][0]["results"]]
+
+    assert all(fps1)                 # every result carries a fingerprint
+    assert fps1 == fps2              # stable across runs of the same findings
+    assert len(set(fps1)) == len(fps1)  # distinct findings → distinct fingerprints

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import Counter
 from datetime import datetime, timezone
@@ -96,6 +97,17 @@ def _sarif_rules(findings: list[Finding]):
     return [rules[i] for i in order], {i: idx for idx, i in enumerate(order)}
 
 
+def _fingerprint(f: Finding) -> str:
+    """Stable id for a logically-identical finding across scans.
+
+    GitHub code scanning uses partialFingerprints to match the "same" alert
+    over time. We derive it from the rule, module, resource, and region so a
+    re-scan of the same issue keeps the same fingerprint.
+    """
+    parts = [f.id, f.module, f.resource or "", str(f.evidence.get("region", ""))]
+    return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
+
+
 def write_sarif(findings: list[Finding], output_dir: str | Path) -> Path:
     """Write findings as a SARIF 2.1.0 report."""
     when = datetime.now(timezone.utc)
@@ -109,6 +121,7 @@ def write_sarif(findings: list[Finding], output_dir: str | Path) -> Path:
             "ruleIndex": rule_index[f.id],
             "level": _SARIF_LEVEL[f.severity],
             "message": {"text": f"{f.description}\nRemediation: {f.remediation}"},
+            "partialFingerprints": {"sentinelFingerprint/v1": _fingerprint(f)},
         }
         if f.resource:
             result["locations"] = [
