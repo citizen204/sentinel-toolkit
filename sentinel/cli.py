@@ -34,6 +34,14 @@ def run_scanners(scanners, config) -> list[Finding]:
             )
     return findings
 
+
+def filter_ignored(findings, ignore_ids) -> list[Finding]:
+    """Drop findings whose rule id is listed in ignore_ids (accepted risks)."""
+    if not ignore_ids:
+        return findings
+    ignore = set(ignore_ids)
+    return [f for f in findings if f.id not in ignore]
+
 app = typer.Typer(
     help="Sentinel — a modular defensive security toolkit (authorized use only).",
     no_args_is_help=True,
@@ -71,6 +79,7 @@ def scan_all(
     """
     cfg = load_config(config)
     findings = run_scanners(all_scanners(), cfg)
+    findings = filter_ignored(findings, cfg.ignore_ids)
     _emit_reports(findings, output_dir, fmt)
 
 
@@ -89,6 +98,7 @@ def scan(
         raise typer.Exit(code=1)
     cfg = load_config(config)
     findings = scanners[name]().run(cfg)
+    findings = filter_ignored(findings, cfg.ignore_ids)
     _emit_reports(findings, output_dir, fmt)
 
 
