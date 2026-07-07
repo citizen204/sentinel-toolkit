@@ -40,3 +40,16 @@ def test_user_with_mfa_is_not_flagged(aws_credentials):
 def test_no_users_yields_no_findings(aws_credentials):
     session = boto3.Session(region_name="us-east-1")
     assert check_users_without_mfa(session) == []
+
+
+@mock_aws
+def test_pagination_covers_all_users(aws_credentials):
+    # moto paginates list_users at 100; a single API call would miss users 101-120.
+    session = boto3.Session(region_name="us-east-1")
+    iam = session.client("iam")
+    for i in range(120):
+        iam.create_user(UserName=f"user-{i:03d}")
+
+    findings = check_users_without_mfa(session)
+
+    assert len(findings) == 120
