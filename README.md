@@ -48,7 +48,7 @@ sharing common plumbing:
 
 | Module | Domain | What it catches |
 |:------:|--------|-----------------|
-| ☁️ **`cloudscan`** | AWS misconfiguration | Public S3 buckets · security groups open to `0.0.0.0/0` on SSH/RDP · IAM users without MFA |
+| ☁️ **`cloudscan`** | AWS misconfiguration | Public S3 buckets · security groups open to `0.0.0.0/0` / `::/0` on SSH/RDP (all regions) · IAM users without MFA |
 | 📜 **`logwatch`** | Log analysis (SIEM-lite) | SSH brute-force attempts · direct `root`/`admin` logins |
 | 🌐 **`webscan`** | Web application | Missing security headers (HSTS, CSP, X-Content-Type-Options, X-Frame-Options) |
 | 📡 **`netmon`** | Network traffic | Port scans · host sweeps — from a flow log **or a live/pcap capture via scapy** |
