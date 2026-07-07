@@ -18,11 +18,17 @@ def _open_to_world(perm: dict) -> bool:
     return any(rng.get("CidrIp") == "0.0.0.0/0" for rng in perm.get("IpRanges", []))
 
 
+def _iter_security_groups(ec2):
+    """Yield every security group, paginating so large accounts are fully covered."""
+    for page in ec2.get_paginator("describe_security_groups").paginate():
+        yield from page.get("SecurityGroups", [])
+
+
 def check_open_security_groups(session) -> list[Finding]:
     """Flag security groups allowing 0.0.0.0/0 inbound on a risky port."""
     ec2 = session.client("ec2")
     findings: list[Finding] = []
-    for sg in ec2.describe_security_groups().get("SecurityGroups", []):
+    for sg in _iter_security_groups(ec2):
         group_id = sg["GroupId"]
         for perm in sg.get("IpPermissions", []):
             if not _open_to_world(perm):

@@ -8,11 +8,12 @@ from .checks.flows import parse_flow_file, check_port_scan, check_host_sweep
 
 
 class NetmonScanner(BaseScanner):
-    """Analyzes a network flow log (config.capture_file) for recon patterns.
+    """Analyzes network traffic (config.capture_file) for recon patterns.
 
-    Live packet capture with scapy is an optional extension: capture traffic to a
-    flow log ('src_ip dst_ip dst_port' per line), then point config.capture_file
-    at it. The detection logic here is pure and fully unit-tested.
+    config.capture_file may be either a text flow log ('src_ip dst_ip dst_port'
+    per line) or a '.pcap'/'.pcapng' capture (parsed with scapy — see capture.py).
+    scapy also provides optional live capture. The detection logic is pure and
+    fully unit-tested.
     """
 
     name = "netmon"
@@ -21,7 +22,11 @@ class NetmonScanner(BaseScanner):
         path = getattr(config, "capture_file", None)
         if not path or not Path(path).exists():
             return []
-        flows = parse_flow_file(path)
+        if str(path).lower().endswith((".pcap", ".pcapng")):
+            from .capture import flows_from_pcap
+            flows = flows_from_pcap(path)
+        else:
+            flows = parse_flow_file(path)
         findings: list[Finding] = []
         findings.extend(check_port_scan(flows))
         findings.extend(check_host_sweep(flows))

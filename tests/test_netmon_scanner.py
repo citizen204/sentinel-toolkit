@@ -24,3 +24,16 @@ def test_run_reads_capture_file(tmp_path):
 def test_run_no_capture_returns_empty():
     from sentinel.modules.netmon.scanner import NetmonScanner
     assert NetmonScanner().run(Config()) == []
+
+
+def test_run_reads_pcap_capture(tmp_path):
+    from scapy.all import IP, TCP, wrpcap
+    from sentinel.modules.netmon.scanner import NetmonScanner
+
+    pkts = [IP(src="10.0.0.5", dst="10.0.0.1") / TCP(dport=p) for p in range(1, 13)]
+    pcap = tmp_path / "scan.pcap"
+    wrpcap(str(pcap), pkts)
+
+    findings = NetmonScanner().run(Config(capture_file=str(pcap)))
+
+    assert any(f.id == "NET-PORT-SCAN" for f in findings)
