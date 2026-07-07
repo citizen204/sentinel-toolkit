@@ -1,5 +1,5 @@
 import json
-from sentinel.core.report import summarize, write_json, write_html
+from sentinel.core.report import summarize, write_json, write_html, write_sarif
 
 
 def test_summarize_counts_all_severities(sample_findings):
@@ -40,3 +40,36 @@ def test_write_json_empty_findings(tmp_path):
     payload = json.loads(path.read_text(encoding="utf-8"))
     assert payload["findings"] == []
     assert payload["summary"]["High"] == 0
+
+
+def test_write_sarif_is_valid_shape(sample_findings, tmp_path):
+    path = write_sarif(sample_findings, tmp_path)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+
+    assert doc["version"] == "2.1.0"
+    run = doc["runs"][0]
+    driver = run["tool"]["driver"]
+    assert driver["name"] == "Sentinel"
+
+    # rules are de-duplicated by id
+    rule_ids = [r["id"] for r in driver["rules"]]
+    assert "CLOUD-S3-PUBLIC-001" in rule_ids
+    assert len(rule_ids) == len(set(rule_ids))
+
+    # one result per finding, with a valid ruleIndex
+    assert len(run["results"]) == len(sample_findings)
+    for result in run["results"]:
+        assert 0 <= result["ruleIndex"] < len(driver["rules"])
+        assert driver["rules"][result["ruleIndex"]]["id"] == result["ruleId"]
+
+    # severity maps to SARIF level (Critical -> error, Low -> note)
+    by_id = {r["ruleId"]: r for r in run["results"]}
+    assert by_id["LOG-BRUTE-001"]["level"] == "error"      # Critical
+    assert by_id["WEB-HEADER-001"]["level"] == "note"      # Low
+
+
+def test_write_sarif_empty(tmp_path):
+    path = write_sarif([], tmp_path)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    assert doc["runs"][0]["results"] == []
+    assert doc["runs"][0]["tool"]["driver"]["rules"] == []
