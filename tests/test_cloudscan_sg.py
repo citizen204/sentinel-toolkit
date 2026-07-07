@@ -76,6 +76,9 @@ def test_ipv6_open_to_world_is_flagged(aws_credentials):
     match = [f for f in findings if f.resource == sg]
     assert len(match) == 1
     assert "::/0" in match[0].evidence["cidr"]
+    # the description/remediation reflect the actual CIDR, not a hardcoded IPv4
+    assert "::/0" in match[0].description
+    assert "0.0.0.0/0" not in match[0].description
 
 
 @mock_aws

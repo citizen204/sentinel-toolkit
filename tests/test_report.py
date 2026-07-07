@@ -89,6 +89,22 @@ def test_write_sarif_empty(tmp_path):
     assert doc["runs"][0]["tool"]["driver"]["rules"] == []
 
 
+def test_fingerprints_distinguish_same_resource_different_port(tmp_path):
+    from sentinel.core.finding import Finding, Severity
+
+    def sg(label, port):
+        return Finding(
+            id="CLOUD-SG-OPEN-INGRESS", module="cloudscan", severity=Severity.HIGH,
+            title=f"Security group open to the world on {label}",
+            description="d", remediation="r", resource="sg-123",
+            evidence={"group_id": "sg-123", "port": port, "cidr": "0.0.0.0/0"},
+        )
+
+    doc = json.loads(write_sarif([sg("SSH", 22), sg("RDP", 3389)], tmp_path).read_text(encoding="utf-8"))
+    fps = [r["partialFingerprints"]["sentinelFingerprint/v1"] for r in doc["runs"][0]["results"]]
+    assert fps[0] != fps[1]  # same SG open on two ports must not collide
+
+
 def test_write_sarif_has_stable_fingerprints(sample_findings, tmp_path):
     run1 = json.loads(write_sarif(sample_findings, tmp_path).read_text(encoding="utf-8"))
     run2 = json.loads(write_sarif(sample_findings, tmp_path).read_text(encoding="utf-8"))

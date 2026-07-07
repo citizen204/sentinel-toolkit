@@ -42,7 +42,8 @@ def _scan_group(sg: dict, region: str | None) -> list[Finding]:
         for port, label in RISKY_PORTS.items():
             if not _covers(perm, port):
                 continue
-            evidence = {"group_id": group_id, "port": port, "cidr": ", ".join(open_cidrs)}
+            cidr_str = ", ".join(open_cidrs)
+            evidence = {"group_id": group_id, "port": port, "cidr": cidr_str}
             if region:
                 evidence["region"] = region
             findings.append(
@@ -52,12 +53,12 @@ def _scan_group(sg: dict, region: str | None) -> list[Finding]:
                     severity=Severity.HIGH,
                     title=f"Security group open to the world on {label}",
                     description=(
-                        f"Security group '{group_id}' allows 0.0.0.0/0 "
+                        f"Security group '{group_id}' allows {cidr_str} "
                         f"inbound on port {port} ({label})."
                     ),
                     remediation=(
                         f"Restrict inbound {label} (port {port}) to known "
-                        f"IP ranges instead of 0.0.0.0/0."
+                        f"IP ranges instead of {cidr_str}."
                     ),
                     category="Network Exposure",
                     references=[_SG_REFERENCE],
