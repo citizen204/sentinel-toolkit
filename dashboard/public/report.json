@@ -9,6 +9,8 @@
       "title": "Possible SSH brute-force attempt",
       "description": "42 failed login attempts from 203.0.113.10.",
       "remediation": "Block the source IP, enforce key-based auth, and deploy fail2ban.",
+      "category": "Authentication",
+      "references": ["https://attack.mitre.org/techniques/T1110/"],
       "evidence": { "ip": "203.0.113.10", "failed_attempts": 42 },
       "resource": "203.0.113.10",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -20,6 +22,8 @@
       "title": "Publicly accessible S3 bucket",
       "description": "S3 bucket 'prod-backups' grants access to a public group (AllUsers).",
       "remediation": "Remove public ACL grants and enable S3 Block Public Access.",
+      "category": "Data Exposure",
+      "references": ["https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"],
       "evidence": { "bucket": "prod-backups", "acl": "public-read" },
       "resource": "prod-backups",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -31,7 +35,9 @@
       "title": "Security group open to the world on SSH",
       "description": "Security group 'sg-0a1b2c' allows 0.0.0.0/0 inbound on port 22 (SSH).",
       "remediation": "Restrict inbound SSH (port 22) to known IP ranges instead of 0.0.0.0/0.",
-      "evidence": { "group_id": "sg-0a1b2c", "port": 22, "cidr": "0.0.0.0/0" },
+      "category": "Network Exposure",
+      "references": ["https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html"],
+      "evidence": { "group_id": "sg-0a1b2c", "port": 22, "cidr": "0.0.0.0/0", "region": "us-east-1" },
       "resource": "sg-0a1b2c",
       "timestamp": "2026-06-28T12:00:00+00:00"
     },
@@ -42,6 +48,8 @@
       "title": "Possible port scan",
       "description": "198.51.100.23 connected to 27 distinct ports.",
       "remediation": "Investigate the source host; block it if unauthorized.",
+      "category": "Reconnaissance",
+      "references": ["https://attack.mitre.org/techniques/T1046/"],
       "evidence": { "src_ip": "198.51.100.23", "distinct_ports": 27 },
       "resource": "198.51.100.23",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -53,6 +61,8 @@
       "title": "IAM user without MFA",
       "description": "IAM user 'deploy-bot' has no MFA device enabled.",
       "remediation": "Enable an MFA device for this IAM user.",
+      "category": "Access Control",
+      "references": ["https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html"],
       "evidence": { "user": "deploy-bot" },
       "resource": "deploy-bot",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -64,6 +74,8 @@
       "title": "Direct privileged login",
       "description": "Successful 'root' login from 203.0.113.7.",
       "remediation": "Disable direct root/admin SSH login; require sudo from named accounts.",
+      "category": "Access Control",
+      "references": ["https://attack.mitre.org/techniques/T1078/"],
       "evidence": { "account": "root", "ip": "203.0.113.7" },
       "resource": "203.0.113.7",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -75,6 +87,8 @@
       "title": "Missing security header: Content-Security-Policy",
       "description": "The response from https://app.example.com does not set the Content-Security-Policy header.",
       "remediation": "Add a Content-Security-Policy header to mitigate XSS.",
+      "category": "Web Hardening",
+      "references": ["https://owasp.org/www-project-secure-headers/"],
       "evidence": { "url": "https://app.example.com", "header": "Content-Security-Policy" },
       "resource": "https://app.example.com",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -86,6 +100,8 @@
       "title": "Missing security header: X-Frame-Options",
       "description": "The response from https://app.example.com does not set the X-Frame-Options header.",
       "remediation": "Add 'X-Frame-Options: DENY' to prevent clickjacking.",
+      "category": "Web Hardening",
+      "references": ["https://owasp.org/www-project-secure-headers/"],
       "evidence": { "url": "https://app.example.com", "header": "X-Frame-Options" },
       "resource": "https://app.example.com",
       "timestamp": "2026-06-28T12:00:00+00:00"

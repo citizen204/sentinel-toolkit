@@ -35,6 +35,19 @@ def test_write_html_contains_summary_and_titles(sample_findings, tmp_path):
     assert "Set the bucket ACL to private." in html
 
 
+def test_write_html_shows_category_and_references(tmp_path):
+    from sentinel.core.finding import Finding, Severity
+
+    f = Finding(
+        id="X", module="m", severity=Severity.HIGH, title="t",
+        description="d", remediation="r",
+        category="Data Exposure", references=["https://example.test/ref"],
+    )
+    html = write_html([f], tmp_path).read_text(encoding="utf-8")
+    assert "Data Exposure" in html
+    assert "https://example.test/ref" in html
+
+
 def test_write_json_empty_findings(tmp_path):
     path = write_json([], tmp_path)
     payload = json.loads(path.read_text(encoding="utf-8"))

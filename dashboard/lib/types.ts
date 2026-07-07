@@ -7,6 +7,8 @@ export interface Finding {
   title: string;
   description: string;
   remediation: string;
+  category?: string | null;
+  references?: string[];
   evidence: Record<string, unknown>;
   resource: string | null;
   timestamp: string;

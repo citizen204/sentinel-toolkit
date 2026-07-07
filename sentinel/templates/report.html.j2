@@ -22,6 +22,10 @@
     .finding.Low { border-color: #ca8a04; }
     .finding.Info { border-color: #2563eb; }
     .rem { color: #065f46; font-size: 0.9rem; }
+    .cat { display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.45rem;
+           border-radius: 999px; background: #e2e8f0; color: #334155; font-size: 0.75rem; }
+    .refs { font-size: 0.8rem; color: #64748b; }
+    .refs a { color: #2563eb; }
     code { background: #eee; padding: 0 0.2rem; }
   </style>
 </head>
@@ -37,9 +41,15 @@
     <div class="finding {{ f.severity.value }}">
       <strong>[{{ f.severity.value }}] {{ f.title }}</strong>
       <span style="color:#888">({{ f.module }} — {{ f.id }})</span>
+      {% if f.category %}<span class="cat">{{ f.category }}</span>{% endif %}
       <p>{{ f.description }}</p>
       {% if f.resource %}<p>Resource: <code>{{ f.resource }}</code></p>{% endif %}
       <p class="rem">Fix: {{ f.remediation }}</p>
+      {% if f.references %}
+        <p class="refs">References:
+          {% for ref in f.references %}<a href="{{ ref }}">{{ ref }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+        </p>
+      {% endif %}
     </div>
   {% endfor %}
 </body>
