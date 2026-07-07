@@ -101,10 +101,18 @@ def _fingerprint(f: Finding) -> str:
     """Stable id for a logically-identical finding across scans.
 
     GitHub code scanning uses partialFingerprints to match the "same" alert
-    over time. We derive it from the rule, module, resource, and region so a
-    re-scan of the same issue keeps the same fingerprint.
+    over time. We include the rule, module, resource, title and the stable
+    identifying evidence (region/port/cidr/header) so two distinct findings on
+    the same resource (e.g. a security group open on both 22 and 3389) get
+    different fingerprints — while volatile counts are deliberately excluded so
+    a re-scan of the same issue keeps the same fingerprint.
     """
-    parts = [f.id, f.module, f.resource or "", str(f.evidence.get("region", ""))]
+    ev = f.evidence
+    parts = [
+        f.id, f.module, f.resource or "", f.title,
+        str(ev.get("region", "")), str(ev.get("port", "")),
+        str(ev.get("cidr", "")), str(ev.get("header", "")),
+    ]
     return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()
 
 
