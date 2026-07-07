@@ -36,3 +36,24 @@ def test_run_aggregates_all_checks(aws_credentials):
 
     ids = {f.id for f in findings}
     assert ids == {"CLOUD-S3-PUBLIC", "CLOUD-SG-OPEN-INGRESS", "CLOUD-IAM-NO-MFA"}
+
+
+@mock_aws
+def test_one_failing_check_does_not_wipe_the_rest(aws_credentials, monkeypatch):
+    from sentinel.modules.cloudscan import scanner as scanner_mod
+
+    session = boto3.Session(region_name="us-east-1")
+    s3 = session.client("s3")
+    s3.create_bucket(Bucket="public-bucket")
+    s3.put_bucket_acl(Bucket="public-bucket", ACL="public-read")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("access denied")
+
+    monkeypatch.setattr(scanner_mod, "check_users_without_mfa", boom)
+
+    findings = scanner_mod.CloudScanner().run(Config())
+
+    ids = {f.id for f in findings}
+    assert "CLOUD-S3-PUBLIC" in ids       # healthy check still produced results
+    assert "CLOUD-CHECK-ERROR" in ids     # failure surfaced, not swallowing everything
