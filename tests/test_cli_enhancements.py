@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import boto3
+import pytest
 from moto import mock_aws
 from typer.testing import CliRunner
 
@@ -46,6 +47,36 @@ def test_select_scanners_exclude():
     selected = _select_scanners(None, "cloudscan")
     assert "cloudscan" not in selected
     assert "webscan" in selected
+
+
+def test_select_scanners_unknown_raises():
+    with pytest.raises(ValueError):
+        _select_scanners("webscna", None)  # typo
+
+
+def test_unknown_include_exits_nonzero():
+    result = runner.invoke(app, ["scan-all", "--include", "webscna"])
+    assert result.exit_code == 1
+    assert "Unknown scanner" in result.stdout
+
+
+def test_unknown_exclude_exits_nonzero():
+    result = runner.invoke(app, ["scan-all", "--exclude", "cloudscna"])
+    assert result.exit_code == 1
+
+
+def test_output_dir_falls_back_to_config(tmp_path):
+    out = tmp_path / "myreports"
+    cfg_file = tmp_path / "sentinel.yaml"
+    cfg_file.write_text(f'output_dir: "{out.as_posix()}"\n', encoding="utf-8")
+
+    # no --output-dir given → should use config's output_dir
+    result = runner.invoke(
+        app,
+        ["scan-all", "--exclude", "cloudscan", "--config", str(cfg_file), "--format", "json"],
+    )
+    assert result.exit_code == 0, result.stdout
+    assert len(list(out.glob("report-*.json"))) == 1
 
 
 # --- init-config -------------------------------------------------------------
