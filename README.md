@@ -39,7 +39,9 @@ sharing common plumbing:
   `Finding`, so reports and the dashboard never care which scanner produced what.
 - 🛟 **Resilient** — one broken scanner never crashes the run; its failure is reported as a finding
   and the rest keep going.
-- ✅ **Genuinely tested** — 60+ tests, CI on every push. AWS is mocked with `moto`, HTTP with
+- 📤 **SARIF-native** — export to SARIF 2.1.0 and pipe findings straight into **GitHub code
+  scanning**; every rule is tagged with a category and MITRE/OWASP/AWS reference.
+- ✅ **Genuinely tested** — 70+ tests, CI on every push. AWS is mocked with `moto`, HTTP with
   `responses`, packets with `scapy` — the suite runs fully offline.
 
 ## 🧩 Modules
@@ -103,10 +105,16 @@ Every finding is structured and tells you **how to fix it**:
 ```
 
 ```bash
-sentinel scan <module>          # run one scanner
-sentinel scan-all               # run every registered scanner
-sentinel scan-all --config sentinel.yaml --format html
+sentinel init-config                       # scaffold a sentinel.yaml to edit
+sentinel scan <module>                     # run one scanner
+sentinel scan-all                          # run every registered scanner
+sentinel scan-all --exclude cloudscan      # skip a scanner (or --include webscan,logwatch)
+sentinel scan-all --format sarif           # SARIF 2.1.0 → GitHub code scanning
+sentinel scan-all --format all             # json + html + sarif at once
 ```
+
+**Output formats:** `json` · `html` · `both` (default) · `sarif` · `all`. Invalid values are
+rejected instead of silently producing nothing.
 
 ## 📊 Dashboard
 
@@ -153,9 +161,14 @@ class MyScanner(BaseScanner):
 
 ## ⚙️ Configuration
 
+Generate a starter file with `sentinel init-config`, then edit:
+
 ```yaml
 # sentinel.yaml
 aws_profile: my-audit-profile          # cloudscan
+aws_regions:                           # cloudscan — scan security groups per region
+  - us-east-1
+  - ap-southeast-2
 target_url: https://app.example.com    # webscan
 log_paths:                             # logwatch
   - /var/log/auth.log
@@ -168,7 +181,7 @@ output_dir: reports
 ## ✅ Testing & CI
 
 ```bash
-pytest -q          # 60+ tests, fully offline
+pytest -q          # 70+ tests, fully offline
 ```
 
 Every push and pull request runs the suite on GitHub Actions (see the CI badge above). No test
@@ -178,9 +191,10 @@ touches a real cloud account, host, or network.
 
 - [x] Four scanner modules + unified reporting + dashboard
 - [x] Failure isolation, pagination, ignore-list, scapy capture
+- [x] SARIF output, multi-region AWS scanning, `init-config`, `--include/--exclude`
 - [ ] More cloud checks (unencrypted EBS/RDS, root access keys, password policy)
 - [ ] Trend view across scans in the dashboard
-- [ ] Additional output formats (SARIF, Markdown)
+- [ ] Markdown output format
 
 ## 🤝 Contributing
 
