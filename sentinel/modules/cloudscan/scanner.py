@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import boto3
 
-from sentinel.core.finding import Finding, Severity
+from sentinel.core.finding import Finding
+from sentinel.core.rule import build_finding
 from sentinel.core.scanner import BaseScanner
 
 from .checks.iam import check_users_without_mfa
@@ -20,14 +21,11 @@ def _run_check(name: str, fn) -> list[Finding]:
         return fn()
     except Exception as exc:  # noqa: BLE001 - isolate any single check failure
         return [
-            Finding(
-                id="CLOUD-CHECK-ERROR",
-                module="cloudscan",
-                severity=Severity.INFO,
+            build_finding(
+                "CLOUD-CHECK-ERROR",
                 title=f"cloudscan check '{name}' failed",
                 description=f"{type(exc).__name__}: {exc}",
                 remediation="Check the AWS permissions/credentials for this check.",
-                category="Operational",
                 evidence={"check": name, "error": str(exc)},
                 resource=name,
             )

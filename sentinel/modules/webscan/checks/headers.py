@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import requests
 
+from sentinel.core.asset import Asset
 from sentinel.core.finding import Finding, Severity
+from sentinel.core.rule import build_finding
+
+from .. import rules  # noqa: F401 - registers webscan rules
 
 # Header -> (severity, remediation) for headers every site should set.
 _REQUIRED_HEADERS = {
@@ -31,15 +35,13 @@ def check_security_headers(url: str, session=None, timeout: int = 10) -> list[Fi
     for header, (severity, remediation) in _REQUIRED_HEADERS.items():
         if header.lower() not in present:
             findings.append(
-                Finding(
-                    id="WEB-MISSING-HEADER",
-                    module="webscan",
-                    severity=severity,
+                build_finding(
+                    "WEB-MISSING-HEADER",
                     title=f"Missing security header: {header}",
+                    severity=severity,
                     description=f"The response from {url} does not set the {header} header.",
                     remediation=remediation,
-                    category="Web Hardening",
-                    references=["https://owasp.org/www-project-secure-headers/"],
+                    asset=Asset(provider="web", type="url", id=url),
                     evidence={"url": url, "header": header},
                     resource=url,
                 )

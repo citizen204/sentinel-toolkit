@@ -4,7 +4,11 @@ from collections import defaultdict
 from pathlib import Path
 from typing import NamedTuple
 
-from sentinel.core.finding import Finding, Severity
+from sentinel.core.asset import Asset
+from sentinel.core.finding import Finding
+from sentinel.core.rule import build_finding
+
+from .. import rules  # noqa: F401 - registers netmon rules
 
 
 class Flow(NamedTuple):
@@ -42,15 +46,11 @@ def check_port_scan(flows, threshold: int = 10) -> list[Finding]:
     for src, ports in ports_by_src.items():
         if len(ports) >= threshold:
             findings.append(
-                Finding(
-                    id="NET-PORT-SCAN",
-                    module="netmon",
-                    severity=Severity.HIGH,
-                    title="Possible port scan",
+                build_finding(
+                    "NET-PORT-SCAN",
                     description=f"{src} connected to {len(ports)} distinct ports.",
                     remediation="Investigate the source host; block it if unauthorized.",
-                    category="Reconnaissance",
-                    references=["https://attack.mitre.org/techniques/T1046/"],
+                    asset=Asset(provider="network", type="ip", id=src),
                     evidence={"src_ip": src, "distinct_ports": len(ports)},
                     resource=src,
                 )
@@ -68,15 +68,11 @@ def check_host_sweep(flows, threshold: int = 10) -> list[Finding]:
     for src, hosts in hosts_by_src.items():
         if len(hosts) >= threshold:
             findings.append(
-                Finding(
-                    id="NET-HOST-SWEEP",
-                    module="netmon",
-                    severity=Severity.MEDIUM,
-                    title="Possible host sweep",
+                build_finding(
+                    "NET-HOST-SWEEP",
                     description=f"{src} contacted {len(hosts)} distinct hosts.",
                     remediation="Investigate the source host for reconnaissance activity.",
-                    category="Reconnaissance",
-                    references=["https://attack.mitre.org/techniques/T1018/"],
+                    asset=Asset(provider="network", type="ip", id=src),
                     evidence={"src_ip": src, "distinct_hosts": len(hosts)},
                     resource=src,
                 )

@@ -21,6 +21,11 @@ def test_public_bucket_is_flagged(aws_credentials):
     public = next(f for f in findings if f.resource == "public-bucket")
     assert public.severity is Severity.HIGH
     assert public.module == "cloudscan"
+    # finding is bound to a structured asset, not just a bare resource string
+    assert public.asset is not None
+    assert public.asset.provider == "aws"
+    assert public.asset.type == "s3_bucket"
+    assert public.asset.id == "public-bucket"
 
 
 @mock_aws

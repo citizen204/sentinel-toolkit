@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from sentinel.core.finding import Finding, Severity
+from sentinel.core.asset import Asset
+from sentinel.core.finding import Finding
+from sentinel.core.rule import build_finding
+
+from .. import rules  # noqa: F401 - registers cloudscan rules
 
 
 def _iter_users(iam):
@@ -18,17 +22,11 @@ def check_users_without_mfa(session) -> list[Finding]:
         devices = iam.list_mfa_devices(UserName=username).get("MFADevices", [])
         if not devices:
             findings.append(
-                Finding(
-                    id="CLOUD-IAM-NO-MFA",
-                    module="cloudscan",
-                    severity=Severity.MEDIUM,
-                    title="IAM user without MFA",
+                build_finding(
+                    "CLOUD-IAM-NO-MFA",
                     description=f"IAM user '{username}' has no MFA device enabled.",
                     remediation="Enable an MFA device for this IAM user.",
-                    category="Access Control",
-                    references=[
-                        "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html"
-                    ],
+                    asset=Asset(provider="aws", type="iam_user", id=username, name=username),
                     evidence={"user": username},
                     resource=username,
                 )
