@@ -36,7 +36,10 @@ sharing common plumbing:
 - 🎯 **Remediation-first** — a finding that says *what's* wrong but not *how* to fix it is only half
   done. Every finding carries a concrete remediation step.
 - 🧱 **One model to rule them all** — cloud, log, web, and network results all become the same
-  `Finding`, so reports and the dashboard never care which scanner produced what.
+  `Finding`, bound to a structured **`Asset`** (provider/account/region/type/id) instead of a bare
+  string — the difference between a flat report and a real security tool.
+- 📚 **Rule catalog** — rule metadata (severity, category, MITRE/OWASP refs, confidence) lives in a
+  central `Rule` registry, not scattered across check code. Browse it with `sentinel rules`.
 - 🛟 **Resilient** — one broken scanner never crashes the run; its failure is reported as a finding
   and the rest keep going.
 - 📤 **SARIF-native** — export to SARIF 2.1.0 and pipe findings straight into **GitHub code
@@ -105,6 +108,7 @@ Every finding is structured and tells you **how to fix it**:
 ```
 
 ```bash
+sentinel rules                             # browse the rule catalog
 sentinel init-config                       # scaffold a sentinel.yaml to edit
 sentinel scan <module>                     # run one scanner
 sentinel scan-all                          # run every registered scanner
@@ -139,7 +143,7 @@ scanner.run(config) ──▶ list[Finding] ──▶ aggregate + filter ──�
 
 ```
 sentinel/
-├─ core/            # shared kernel: Finding · BaseScanner registry · config · report
+├─ core/            # shared kernel: Finding · Asset · Rule catalog · scanner registry · report
 ├─ modules/         # cloudscan · logwatch · webscan · netmon (checks/ = one function per rule)
 ├─ templates/       # HTML report template
 └─ cli.py           # Typer CLI: list-scanners · scan <name> · scan-all
