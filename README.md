@@ -51,7 +51,7 @@ sharing common plumbing:
 
 | Module | Domain | What it catches |
 |:------:|--------|-----------------|
-| ☁️ **`cloudscan`** | AWS misconfiguration | Public S3 buckets · security groups open to `0.0.0.0/0` / `::/0` on SSH/RDP (all regions) · IAM users without MFA |
+| ☁️ **`cloudscan`** | AWS misconfiguration | S3 (public ACL, no encryption/versioning/Block-Public-Access) · security groups open to `0.0.0.0/0` / `::/0` on SSH/RDP (all regions) · IAM (no MFA, no password policy, AdministratorAccess) · EBS/RDS unencrypted |
 | 📜 **`logwatch`** | Log analysis (SIEM-lite) | SSH brute-force attempts · direct `root`/`admin` logins |
 | 🌐 **`webscan`** | Web application | Missing security headers (HSTS, CSP, X-Content-Type-Options, X-Frame-Options) |
 | 📡 **`netmon`** | Network traffic | Port scans · host sweeps — from a flow log **or a live/pcap capture via scapy** |
@@ -62,8 +62,15 @@ sharing common plumbing:
 | Rule ID | Module | Severity |
 |---------|--------|:--------:|
 | `CLOUD-S3-PUBLIC` | cloudscan | High |
+| `CLOUD-S3-NO-ENCRYPTION` | cloudscan | Medium |
+| `CLOUD-S3-NO-VERSIONING` | cloudscan | Low |
+| `CLOUD-S3-NO-BPA` | cloudscan | Medium |
 | `CLOUD-SG-OPEN-INGRESS` | cloudscan | High |
 | `CLOUD-IAM-NO-MFA` | cloudscan | Medium |
+| `CLOUD-IAM-NO-PASSWORD-POLICY` | cloudscan | Medium |
+| `CLOUD-IAM-ADMIN-POLICY` | cloudscan | High |
+| `CLOUD-EBS-UNENCRYPTED` | cloudscan | Medium |
+| `CLOUD-RDS-UNENCRYPTED` | cloudscan | High |
 | `LOG-BRUTEFORCE` | logwatch | High |
 | `LOG-ROOT-LOGIN` | logwatch | Medium |
 | `WEB-MISSING-HEADER` | webscan | Low–Medium |
@@ -197,7 +204,7 @@ cloud account, host, or network.
 - [x] Four scanner modules + unified reporting + dashboard
 - [x] Failure isolation, pagination, ignore-list, scapy capture
 - [x] SARIF output, multi-region AWS scanning, `init-config`, `--include/--exclude`
-- [ ] More cloud checks (unencrypted EBS/RDS, root access keys, password policy)
+- [x] Deeper cloud checks (S3 encryption/versioning/BPA, IAM password policy + admin, EBS/RDS encryption)
 - [ ] Trend view across scans in the dashboard
 - [ ] Markdown output format
 
