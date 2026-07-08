@@ -59,6 +59,35 @@ def test_model_dump_json_is_serializable():
     assert isinstance(data["timestamp"], str)
 
 
+def test_new_fields_default():
+    from sentinel.core.finding import Confidence, Status
+    f = Finding(**_valid_kwargs())
+    assert f.confidence is Confidence.MEDIUM
+    assert f.status is Status.OPEN
+    assert f.asset is None
+
+
+def test_dedupe_key_is_stable_and_serialized():
+    f = Finding(**_valid_kwargs())
+    key = f.dedupe_key
+    assert len(key) == 64  # sha256 hex digest
+    assert f.dedupe_key == key  # stable
+    data = f.model_dump(mode="json")
+    assert data["dedupe_key"] == key  # computed field is serialized
+
+
+def test_asset_can_be_attached():
+    from sentinel.core.asset import Asset
+    kwargs = _valid_kwargs()
+    kwargs["asset"] = Asset(
+        provider="aws", type="s3_bucket", id="b",
+        account_id="123456789012", region="us-east-1",
+    )
+    f = Finding(**kwargs)
+    assert f.asset.provider == "aws"
+    assert f.asset.region == "us-east-1"
+
+
 def test_category_and_references_default_and_set():
     f = Finding(**_valid_kwargs())
     assert f.category is None

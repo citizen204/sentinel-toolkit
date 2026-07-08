@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from sentinel.core.finding import Finding, Severity
+from sentinel.core.asset import Asset
+from sentinel.core.finding import Finding
+from sentinel.core.rule import build_finding
+
+from .. import rules  # noqa: F401 - registers cloudscan rules
 
 # Ports that are dangerous to expose to the whole internet.
 RISKY_PORTS = {22: "SSH", 3389: "RDP"}
-
-_SG_REFERENCE = "https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html"
 
 
 def _covers(perm: dict, port: int) -> bool:
@@ -47,10 +49,8 @@ def _scan_group(sg: dict, region: str | None) -> list[Finding]:
             if region:
                 evidence["region"] = region
             findings.append(
-                Finding(
-                    id="CLOUD-SG-OPEN-INGRESS",
-                    module="cloudscan",
-                    severity=Severity.HIGH,
+                build_finding(
+                    "CLOUD-SG-OPEN-INGRESS",
                     title=f"Security group open to the world on {label}",
                     description=(
                         f"Security group '{group_id}' allows {cidr_str} "
@@ -60,8 +60,10 @@ def _scan_group(sg: dict, region: str | None) -> list[Finding]:
                         f"Restrict inbound {label} (port {port}) to known "
                         f"IP ranges instead of {cidr_str}."
                     ),
-                    category="Network Exposure",
-                    references=[_SG_REFERENCE],
+                    asset=Asset(
+                        provider="aws", type="security_group",
+                        id=group_id, region=region,
+                    ),
                     evidence=evidence,
                     resource=group_id,
                 )
@@ -70,7 +72,7 @@ def _scan_group(sg: dict, region: str | None) -> list[Finding]:
 
 
 def check_open_security_groups(session, regions=None) -> list[Finding]:
-    """Flag security groups allowing 0.0.0.0/0 inbound on a risky port.
+    """Flag security groups allowing 0.0.0.0/0 or ::/0 inbound on a risky port.
 
     When `regions` is given, every region is scanned; otherwise the session's
     default region is used.

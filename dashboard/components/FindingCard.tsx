@@ -25,13 +25,35 @@ export default function FindingCard({ finding }: { finding: Finding }) {
             {finding.category}
           </span>
         )}
+        {finding.confidence && (
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+            confidence: {finding.confidence}
+          </span>
+        )}
       </div>
       <p className="mt-2 text-sm text-slate-700">{finding.description}</p>
-      {finding.resource && (
+      {finding.asset ? (
         <p className="mt-1 text-sm">
-          Resource:{" "}
-          <code className="rounded bg-slate-100 px-1">{finding.resource}</code>
+          Asset:{" "}
+          <code className="rounded bg-slate-100 px-1">
+            {finding.asset.type}:{finding.asset.id}
+          </code>
+          {(finding.asset.region || finding.asset.account_id) && (
+            <span className="text-slate-500">
+              {" "}
+              ({finding.asset.provider}
+              {finding.asset.account_id ? ` · ${finding.asset.account_id}` : ""}
+              {finding.asset.region ? ` · ${finding.asset.region}` : ""})
+            </span>
+          )}
         </p>
+      ) : (
+        finding.resource && (
+          <p className="mt-1 text-sm">
+            Resource:{" "}
+            <code className="rounded bg-slate-100 px-1">{finding.resource}</code>
+          </p>
+        )
       )}
       <p className="mt-2 text-sm text-emerald-700">Fix: {finding.remediation}</p>
       {finding.references && finding.references.length > 0 && (

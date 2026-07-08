@@ -54,6 +54,13 @@ def test_select_scanners_unknown_raises():
         _select_scanners("webscna", None)  # typo
 
 
+def test_rules_command_lists_catalog():
+    result = runner.invoke(app, ["rules"])
+    assert result.exit_code == 0
+    assert "CLOUD-S3-PUBLIC" in result.stdout
+    assert "NET-PORT-SCAN" in result.stdout
+
+
 def test_unknown_include_exits_nonzero():
     result = runner.invoke(app, ["scan-all", "--include", "webscna"])
     assert result.exit_code == 1

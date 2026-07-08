@@ -3,7 +3,11 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
-from sentinel.core.finding import Finding, Severity
+from sentinel.core.asset import Asset
+from sentinel.core.finding import Finding
+from sentinel.core.rule import build_finding
+
+from .. import rules  # noqa: F401 - registers logwatch rules
 
 _IP = r"(\d{1,3}(?:\.\d{1,3}){3})"
 _FAILED = re.compile(r"Failed password for (?:invalid user )?\S+ from " + _IP)
@@ -22,18 +26,14 @@ def check_bruteforce(lines, threshold: int = 5) -> list[Finding]:
     for ip, attempts in counts.items():
         if attempts >= threshold:
             findings.append(
-                Finding(
-                    id="LOG-BRUTEFORCE",
-                    module="logwatch",
-                    severity=Severity.HIGH,
-                    title="Possible SSH brute-force attempt",
+                build_finding(
+                    "LOG-BRUTEFORCE",
                     description=f"{attempts} failed login attempts from {ip}.",
                     remediation=(
                         "Block the source IP, enforce key-based auth, and deploy "
                         "fail2ban or an equivalent rate limiter."
                     ),
-                    category="Authentication",
-                    references=["https://attack.mitre.org/techniques/T1110/"],
+                    asset=Asset(provider="host", type="ip", id=ip),
                     evidence={"ip": ip, "failed_attempts": attempts},
                     resource=ip,
                 )
@@ -49,18 +49,14 @@ def check_root_login(lines) -> list[Finding]:
         if match:
             account, ip = match.group(1), match.group(2)
             findings.append(
-                Finding(
-                    id="LOG-ROOT-LOGIN",
-                    module="logwatch",
-                    severity=Severity.MEDIUM,
-                    title="Direct privileged login",
+                build_finding(
+                    "LOG-ROOT-LOGIN",
                     description=f"Successful '{account}' login from {ip}.",
                     remediation=(
                         "Disable direct root/admin SSH login; require sudo from "
                         "named user accounts."
                     ),
-                    category="Access Control",
-                    references=["https://attack.mitre.org/techniques/T1078/"],
+                    asset=Asset(provider="host", type="ip", id=ip),
                     evidence={"account": account, "ip": ip},
                     resource=ip,
                 )

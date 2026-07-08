@@ -11,6 +11,9 @@
       "remediation": "Block the source IP, enforce key-based auth, and deploy fail2ban.",
       "category": "Authentication",
       "references": ["https://attack.mitre.org/techniques/T1110/"],
+      "confidence": "Medium",
+      "status": "open",
+      "asset": { "provider": "host", "type": "ip", "id": "203.0.113.10" },
       "evidence": { "ip": "203.0.113.10", "failed_attempts": 42 },
       "resource": "203.0.113.10",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -24,6 +27,9 @@
       "remediation": "Remove public ACL grants and enable S3 Block Public Access.",
       "category": "Data Exposure",
       "references": ["https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"],
+      "confidence": "High",
+      "status": "open",
+      "asset": { "provider": "aws", "type": "s3_bucket", "id": "prod-backups", "account_id": "123456789012" },
       "evidence": { "bucket": "prod-backups", "acl": "public-read" },
       "resource": "prod-backups",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -37,6 +43,9 @@
       "remediation": "Restrict inbound SSH (port 22) to known IP ranges instead of 0.0.0.0/0.",
       "category": "Network Exposure",
       "references": ["https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html"],
+      "confidence": "High",
+      "status": "open",
+      "asset": { "provider": "aws", "type": "security_group", "id": "sg-0a1b2c", "account_id": "123456789012", "region": "us-east-1" },
       "evidence": { "group_id": "sg-0a1b2c", "port": 22, "cidr": "0.0.0.0/0", "region": "us-east-1" },
       "resource": "sg-0a1b2c",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -50,6 +59,9 @@
       "remediation": "Investigate the source host; block it if unauthorized.",
       "category": "Reconnaissance",
       "references": ["https://attack.mitre.org/techniques/T1046/"],
+      "confidence": "Medium",
+      "status": "open",
+      "asset": { "provider": "network", "type": "ip", "id": "198.51.100.23" },
       "evidence": { "src_ip": "198.51.100.23", "distinct_ports": 27 },
       "resource": "198.51.100.23",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -63,6 +75,9 @@
       "remediation": "Enable an MFA device for this IAM user.",
       "category": "Access Control",
       "references": ["https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html"],
+      "confidence": "High",
+      "status": "open",
+      "asset": { "provider": "aws", "type": "iam_user", "id": "deploy-bot", "account_id": "123456789012" },
       "evidence": { "user": "deploy-bot" },
       "resource": "deploy-bot",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -76,6 +91,9 @@
       "remediation": "Disable direct root/admin SSH login; require sudo from named accounts.",
       "category": "Access Control",
       "references": ["https://attack.mitre.org/techniques/T1078/"],
+      "confidence": "Medium",
+      "status": "open",
+      "asset": { "provider": "host", "type": "ip", "id": "203.0.113.7" },
       "evidence": { "account": "root", "ip": "203.0.113.7" },
       "resource": "203.0.113.7",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -89,6 +107,9 @@
       "remediation": "Add a Content-Security-Policy header to mitigate XSS.",
       "category": "Web Hardening",
       "references": ["https://owasp.org/www-project-secure-headers/"],
+      "confidence": "High",
+      "status": "open",
+      "asset": { "provider": "web", "type": "url", "id": "https://app.example.com" },
       "evidence": { "url": "https://app.example.com", "header": "Content-Security-Policy" },
       "resource": "https://app.example.com",
       "timestamp": "2026-06-28T12:00:00+00:00"
@@ -102,6 +123,9 @@
       "remediation": "Add 'X-Frame-Options: DENY' to prevent clickjacking.",
       "category": "Web Hardening",
       "references": ["https://owasp.org/www-project-secure-headers/"],
+      "confidence": "High",
+      "status": "open",
+      "asset": { "provider": "web", "type": "url", "id": "https://app.example.com" },
       "evidence": { "url": "https://app.example.com", "header": "X-Frame-Options" },
       "resource": "https://app.example.com",
       "timestamp": "2026-06-28T12:00:00+00:00"
