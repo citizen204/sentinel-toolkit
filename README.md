@@ -9,6 +9,7 @@ network with pluggable scanners, normalises everything into one finding model, a
 single prioritised report — with a concrete fix for every issue.
 
 [![CI](https://github.com/citizen204/sentinel-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/citizen204/sentinel-toolkit/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/citizen204/sentinel-toolkit/actions/workflows/codeql.yml/badge.svg)](https://github.com/citizen204/sentinel-toolkit/actions/workflows/codeql.yml)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Security](https://img.shields.io/badge/security-defensive-informational.svg)
@@ -90,6 +91,16 @@ pip install -e ".[dev]"
 sentinel list-scanners      # what's available
 sentinel scan-all           # run everything → reports/
 ```
+
+Or with Docker:
+
+```bash
+docker build -t sentinel .
+docker run --rm -v "$PWD/reports:/work/reports" sentinel scan-all
+```
+
+`cloudscan` needs only read-only AWS permissions — a least-privilege policy is in
+[docs/aws-iam-policy.json](docs/aws-iam-policy.json).
 
 ## 🎯 Usage
 
@@ -195,9 +206,10 @@ output_dir: reports
 pytest -q          # 70+ tests, fully offline
 ```
 
-Every push and pull request runs on GitHub Actions (see the CI badge above): **pytest + `ruff`
-lint** for the toolkit and a **`npm run build`** job for the dashboard. No test touches a real
-cloud account, host, or network.
+Every push and pull request runs on GitHub Actions (see the badges above): **pytest + `ruff`
+lint** for the toolkit, a **dashboard eslint + build** job, and **CodeQL** static analysis for
+Python and TypeScript. **Dependabot** keeps pip, npm, and Actions dependencies up to date. No
+test touches a real cloud account, host, or network.
 
 ## 🗺️ Roadmap
 
@@ -205,13 +217,15 @@ cloud account, host, or network.
 - [x] Failure isolation, pagination, ignore-list, scapy capture
 - [x] SARIF output, multi-region AWS scanning, `init-config`, `--include/--exclude`
 - [x] Deeper cloud checks (S3 encryption/versioning/BPA, IAM password policy + admin, EBS/RDS encryption)
+- [x] Production hygiene: CodeQL, Dependabot, Docker, SECURITY/CONTRIBUTING/CHANGELOG
 - [ ] Trend view across scans in the dashboard
 - [ ] Markdown output format
 
 ## 🤝 Contributing
 
-Issues and PRs are welcome. Each module is self-contained: add a `BaseScanner` subclass under
-`sentinel/modules/`, register it, and ship it with tests. Run `pytest -q` before opening a PR.
+Issues and PRs are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the checks to run,
+and how to add a scanner or rule. Security reports: see [SECURITY.md](SECURITY.md). Release notes
+live in [CHANGELOG.md](CHANGELOG.md).
 
 ## 👤 About
 
