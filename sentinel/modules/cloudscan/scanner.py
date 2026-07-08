@@ -6,7 +6,7 @@ from sentinel.core.finding import Finding
 from sentinel.core.rule import build_finding
 from sentinel.core.scanner import BaseScanner
 
-from .checks.iam import check_users_without_mfa
+from .checks.iam import check_admin_users, check_password_policy, check_users_without_mfa
 from .checks.s3 import (
     check_bucket_encryption,
     check_bucket_public_access_block,
@@ -62,4 +62,6 @@ class CloudScanner(BaseScanner):
         findings += _run_check(
             "iam_users_without_mfa", lambda: check_users_without_mfa(session)
         )
+        findings += _run_check("iam_password_policy", lambda: check_password_policy(session))
+        findings += _run_check("iam_admin_users", lambda: check_admin_users(session))
         return findings
