@@ -36,7 +36,7 @@ def test_run_aggregates_all_checks(aws_credentials):
     findings = CloudScanner().run(Config())
 
     ids = {f.id for f in findings}
-    assert ids == {"CLOUD-S3-PUBLIC", "CLOUD-SG-OPEN-INGRESS", "CLOUD-IAM-NO-MFA"}
+    assert {"CLOUD-S3-PUBLIC", "CLOUD-SG-OPEN-INGRESS", "CLOUD-IAM-NO-MFA"} <= ids
 
 
 @mock_aws

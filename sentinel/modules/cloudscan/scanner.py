@@ -7,7 +7,12 @@ from sentinel.core.rule import build_finding
 from sentinel.core.scanner import BaseScanner
 
 from .checks.iam import check_users_without_mfa
-from .checks.s3 import check_public_buckets
+from .checks.s3 import (
+    check_bucket_encryption,
+    check_bucket_public_access_block,
+    check_bucket_versioning,
+    check_public_buckets,
+)
 from .checks.security_groups import check_open_security_groups
 
 
@@ -45,6 +50,11 @@ class CloudScanner(BaseScanner):
 
         findings: list[Finding] = []
         findings += _run_check("s3_public_buckets", lambda: check_public_buckets(session))
+        findings += _run_check("s3_encryption", lambda: check_bucket_encryption(session))
+        findings += _run_check("s3_versioning", lambda: check_bucket_versioning(session))
+        findings += _run_check(
+            "s3_block_public_access", lambda: check_bucket_public_access_block(session)
+        )
         findings += _run_check(
             "open_security_groups",
             lambda: check_open_security_groups(session, config.aws_regions),
