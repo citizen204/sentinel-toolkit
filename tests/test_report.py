@@ -49,6 +49,21 @@ def test_write_html_shows_category_and_references(tmp_path):
     assert "https://example.test/ref" in html
 
 
+def test_write_html_shows_asset_and_confidence(tmp_path):
+    from sentinel.core.asset import Asset
+    from sentinel.core.finding import Confidence, Finding, Severity
+
+    f = Finding(
+        id="X", module="m", severity=Severity.HIGH, title="t",
+        description="d", remediation="r", confidence=Confidence.HIGH,
+        asset=Asset(provider="aws", type="s3_bucket", id="b", region="us-east-1"),
+    )
+    html = write_html([f], tmp_path).read_text(encoding="utf-8")
+    assert "s3_bucket:b" in html
+    assert "us-east-1" in html
+    assert "confidence: High" in html
+
+
 def test_write_json_empty_findings(tmp_path):
     path = write_json([], tmp_path)
     payload = json.loads(path.read_text(encoding="utf-8"))

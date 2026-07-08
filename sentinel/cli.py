@@ -81,6 +81,18 @@ def list_scanners() -> None:
         typer.echo(name)
 
 
+@app.command("rules")
+def rules() -> None:
+    """List the rule catalog (id, severity, category, title)."""
+    from sentinel.core.rule import RULES
+    if not RULES:
+        typer.echo("No rules registered.")
+        return
+    for rid in sorted(RULES):
+        r = RULES[rid]
+        typer.echo(f"{r.id}  [{r.severity.value}/{r.category}]  {r.title}")
+
+
 def _tokens(value: str | None) -> set[str]:
     return {n.strip() for n in value.split(",") if n.strip()} if value else set()
 

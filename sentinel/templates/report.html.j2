@@ -42,8 +42,13 @@
       <strong>[{{ f.severity.value }}] {{ f.title }}</strong>
       <span style="color:#888">({{ f.module }} — {{ f.id }})</span>
       {% if f.category %}<span class="cat">{{ f.category }}</span>{% endif %}
+      {% if f.confidence %}<span class="cat">confidence: {{ f.confidence.value }}</span>{% endif %}
       <p>{{ f.description }}</p>
-      {% if f.resource %}<p>Resource: <code>{{ f.resource }}</code></p>{% endif %}
+      {% if f.asset %}
+        <p>Asset: <code>{{ f.asset.type }}:{{ f.asset.id }}</code>
+          {% if f.asset.region %}<span class="refs">({{ f.asset.provider }} · {{ f.asset.region }})</span>{% endif %}
+        </p>
+      {% elif f.resource %}<p>Resource: <code>{{ f.resource }}</code></p>{% endif %}
       <p class="rem">Fix: {{ f.remediation }}</p>
       {% if f.references %}
         <p class="refs">References:
