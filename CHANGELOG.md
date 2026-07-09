@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Professional suppressions: accept risks by rule/resource with a reason and optional expiry;
+  suppressed findings are kept in reports (SARIF `suppressions`, HTML/dashboard markers) and
+  counted separately instead of being silently dropped.
+- `sentinel diff <old.json> <new.json>` — new / resolved / persisting findings across scans,
+  matched by stable `dedupe_key`.
+
 ## [0.1.0] - 2026-07-08
 
 ### Added
