@@ -10,13 +10,21 @@ const BORDER: Record<Severity, string> = {
 };
 
 export default function FindingCard({ finding }: { finding: Finding }) {
+  const suppressed = finding.status === "suppressed";
   return (
     <div
-      className={`rounded-lg border border-l-4 bg-white p-4 shadow-sm ${BORDER[finding.severity]}`}
+      className={`rounded-lg border border-l-4 bg-white p-4 shadow-sm ${BORDER[finding.severity]} ${
+        suppressed ? "opacity-60" : ""
+      }`}
     >
       <div className="flex flex-wrap items-center gap-2">
         <SeverityBadge severity={finding.severity} />
         <span className="font-semibold">{finding.title}</span>
+        {suppressed && (
+          <span className="rounded-full bg-slate-300 px-2 py-0.5 text-xs text-slate-700">
+            suppressed{finding.suppression_reason ? `: ${finding.suppression_reason}` : ""}
+          </span>
+        )}
         <span className="text-xs text-slate-500">
           {finding.module} · {finding.id}
         </span>

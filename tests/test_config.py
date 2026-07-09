@@ -29,6 +29,23 @@ def test_load_from_yaml(tmp_path):
     assert cfg.output_dir == "out"
 
 
+def test_load_suppressions(tmp_path):
+    cfg_file = tmp_path / "s.yaml"
+    cfg_file.write_text(
+        "suppressions:\n"
+        "  - rule: CLOUD-IAM-NO-MFA\n"
+        "    resource: bot\n"
+        "    reason: accepted\n"
+        "    expires: 2027-01-01\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_file)
+    assert len(cfg.suppressions) == 1
+    assert cfg.suppressions[0].rule == "CLOUD-IAM-NO-MFA"
+    assert cfg.suppressions[0].resource == "bot"
+    assert str(cfg.suppressions[0].expires) == "2027-01-01"
+
+
 def test_empty_yaml_file_yields_defaults(tmp_path):
     cfg_file = tmp_path / "empty.yaml"
     cfg_file.write_text("")

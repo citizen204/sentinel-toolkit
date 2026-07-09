@@ -1,6 +1,7 @@
 {
   "generated_at": "2026-06-28T12:00:00+00:00",
-  "summary": { "Critical": 1, "High": 3, "Medium": 2, "Low": 2, "Info": 0 },
+  "summary": { "Critical": 1, "High": 3, "Medium": 1, "Low": 2, "Info": 0 },
+  "suppressed": 1,
   "findings": [
     {
       "id": "LOG-BRUTEFORCE",
@@ -76,7 +77,8 @@
       "category": "Access Control",
       "references": ["https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html"],
       "confidence": "High",
-      "status": "open",
+      "status": "suppressed",
+      "suppression_reason": "service account, MFA not applicable",
       "asset": { "provider": "aws", "type": "iam_user", "id": "deploy-bot", "account_id": "123456789012" },
       "evidence": { "user": "deploy-bot" },
       "resource": "deploy-bot",

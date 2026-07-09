@@ -5,6 +5,8 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
+from .suppression import Suppression
+
 
 class Config(BaseModel):
     aws_profile: str | None = None
@@ -13,6 +15,7 @@ class Config(BaseModel):
     log_paths: list[str] = Field(default_factory=list)
     capture_file: str | None = None
     ignore_ids: list[str] = Field(default_factory=list)
+    suppressions: list[Suppression] = Field(default_factory=list)
     output_dir: str = "reports"
 
 

@@ -61,6 +61,11 @@ export default function Home() {
         <>
           <div className="mt-6">
             <SummaryBar summary={report.summary} />
+            {report.suppressed ? (
+              <p className="mt-2 text-sm text-slate-500">
+                {report.suppressed} finding(s) suppressed
+              </p>
+            ) : null}
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">

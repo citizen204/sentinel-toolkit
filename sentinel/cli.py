@@ -10,6 +10,7 @@ from sentinel.core import report as report_mod
 from sentinel.core.config import load_config
 from sentinel.core.finding import Finding, Severity
 from sentinel.core.scanner import all_scanners
+from sentinel.core.suppression import apply_suppressions
 
 
 class OutputFormat(str, Enum):
@@ -67,7 +68,10 @@ def _emit_reports(findings, output_dir: str, fmt) -> None:
         typer.echo(f"HTML report: {report_mod.write_html(findings, output_dir)}")
     if fmt in ("sarif", "all"):
         typer.echo(f"SARIF report: {report_mod.write_sarif(findings, output_dir)}")
-    typer.echo(f"Scan complete: {len(findings)} finding(s).")
+    suppressed = report_mod.count_suppressed(findings)
+    total = len(findings)
+    note = f" ({suppressed} suppressed)" if suppressed else ""
+    typer.echo(f"Scan complete: {total} finding(s){note}.")
 
 
 @app.command("list-scanners")
@@ -145,6 +149,7 @@ def scan_all(
         raise typer.Exit(code=1)
     findings = run_scanners(selected, cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
+    findings = apply_suppressions(findings, cfg.suppressions)
     _emit_reports(findings, output_dir or cfg.output_dir, fmt)
 
 
@@ -168,6 +173,7 @@ def scan(
     cfg = load_config(config)
     findings = scanners[name]().run(cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
+    findings = apply_suppressions(findings, cfg.suppressions)
     _emit_reports(findings, output_dir or cfg.output_dir, fmt)
 
 
@@ -180,7 +186,12 @@ target_url: https://app.example.com    # webscan: URL to check
 log_paths:                             # logwatch: auth logs to analyse
   - /var/log/auth.log
 capture_file: capture.pcap             # netmon: a flow log or a .pcap/.pcapng
-ignore_ids: []                         # suppress accepted-risk findings by rule id
+ignore_ids: []                         # hard-drop findings by rule id
+suppressions:                          # accepted risks: kept in the report, marked suppressed
+  - rule: CLOUD-IAM-NO-MFA
+    resource: deploy-bot               # optional; omit to match any resource
+    reason: service account, MFA not applicable
+    expires: 2027-01-01                # optional; suppression lapses after this date
 output_dir: reports
 """
 
