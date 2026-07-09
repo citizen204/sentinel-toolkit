@@ -41,6 +41,9 @@ sharing common plumbing:
   string — the difference between a flat report and a real security tool.
 - 📚 **Rule catalog** — rule metadata (severity, category, MITRE/OWASP refs, confidence) lives in a
   central `Rule` registry, not scattered across check code. Browse it with `sentinel rules`.
+- 🔕 **Grown-up noise control** — accept risks with expiring, reasoned **suppressions** (kept and
+  counted in the report, not silently dropped), and **diff scans** for new/resolved/persisting
+  findings via stable fingerprints.
 - 🛟 **Resilient** — one broken scanner never crashes the run; its failure is reported as a finding
   and the rest keep going.
 - 📤 **SARIF-native** — export to SARIF 2.1.0 and pipe findings straight into **GitHub code
@@ -138,6 +141,12 @@ sentinel scan-all --format all             # json + html + sarif at once
 **Output formats:** `json` · `html` · `both` (default) · `sarif` · `all`. Invalid values are
 rejected instead of silently producing nothing.
 
+Track posture over time by diffing two JSON reports:
+
+```bash
+sentinel diff reports/last-week.json reports/today.json   # new / resolved / persisting
+```
+
 ## 📊 Dashboard
 
 A Next.js + Tailwind UI: severity summary, per-severity filtering, a card per finding, and
@@ -195,8 +204,13 @@ target_url: https://app.example.com    # webscan
 log_paths:                             # logwatch
   - /var/log/auth.log
 capture_file: capture.pcap             # netmon — a flow log OR a .pcap/.pcapng
-ignore_ids:                            # suppress accepted-risk findings by rule id
+ignore_ids:                            # hard-drop findings by rule id
   - CLOUD-IAM-NO-MFA
+suppressions:                          # accepted risks: kept in the report, marked suppressed
+  - rule: CLOUD-IAM-NO-MFA
+    resource: deploy-bot               # optional; omit to match any resource
+    reason: service account, MFA not applicable
+    expires: 2027-01-01                # optional; suppression lapses after this date
 output_dir: reports
 ```
 
@@ -218,6 +232,7 @@ test touches a real cloud account, host, or network.
 - [x] SARIF output, multi-region AWS scanning, `init-config`, `--include/--exclude`
 - [x] Deeper cloud checks (S3 encryption/versioning/BPA, IAM password policy + admin, EBS/RDS encryption)
 - [x] Production hygiene: CodeQL, Dependabot, Docker, SECURITY/CONTRIBUTING/CHANGELOG
+- [x] Suppressions (rule/resource/expiry/reason) and `sentinel diff` (new/resolved/persisting)
 - [ ] Trend view across scans in the dashboard
 - [ ] Markdown output format
 

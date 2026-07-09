@@ -21,6 +21,7 @@ export interface Finding {
   references?: string[];
   confidence?: string;
   status?: string;
+  suppression_reason?: string | null;
   asset?: Asset | null;
   dedupe_key?: string;
   evidence: Record<string, unknown>;
@@ -31,5 +32,6 @@ export interface Finding {
 export interface Report {
   generated_at: string;
   summary: Record<Severity, number>;
+  suppressed?: number;
   findings: Finding[];
 }

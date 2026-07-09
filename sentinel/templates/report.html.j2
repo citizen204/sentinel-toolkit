@@ -26,6 +26,9 @@
            border-radius: 999px; background: #e2e8f0; color: #334155; font-size: 0.75rem; }
     .refs { font-size: 0.8rem; color: #64748b; }
     .refs a { color: #2563eb; }
+    .supp { display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.45rem;
+            border-radius: 999px; background: #cbd5e1; color: #334155; font-size: 0.75rem; }
+    .finding.suppressed { opacity: 0.55; }
     code { background: #eee; padding: 0 0.2rem; }
   </style>
 </head>
@@ -36,11 +39,13 @@
     {% for sev, count in summary.items() %}
       <span class="{{ sev }}">{{ sev }}: {{ count }}</span>
     {% endfor %}
+    {% if suppressed %}<span class="supp">Suppressed: {{ suppressed }}</span>{% endif %}
   </div>
   {% for f in findings %}
-    <div class="finding {{ f.severity.value }}">
+    <div class="finding {{ f.severity.value }}{% if f.status.value == 'suppressed' %} suppressed{% endif %}">
       <strong>[{{ f.severity.value }}] {{ f.title }}</strong>
       <span style="color:#888">({{ f.module }} — {{ f.id }})</span>
+      {% if f.status.value == 'suppressed' %}<span class="supp">suppressed{% if f.suppression_reason %}: {{ f.suppression_reason }}{% endif %}</span>{% endif %}
       {% if f.category %}<span class="cat">{{ f.category }}</span>{% endif %}
       {% if f.confidence %}<span class="cat">confidence: {{ f.confidence.value }}</span>{% endif %}
       <p>{{ f.description }}</p>

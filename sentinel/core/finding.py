@@ -43,6 +43,7 @@ class Finding(BaseModel):
     references: list[str] = Field(default_factory=list)
     confidence: Confidence = Confidence.MEDIUM
     status: Status = Status.OPEN
+    suppression_reason: str | None = None
     asset: Asset | None = None
     evidence: dict = Field(default_factory=dict)
     resource: str | None = None

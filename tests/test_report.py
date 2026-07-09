@@ -71,6 +71,22 @@ def test_write_json_empty_findings(tmp_path):
     assert payload["summary"]["High"] == 0
 
 
+def test_suppressed_excluded_from_summary_and_counted(tmp_path):
+    from sentinel.core.finding import Finding, Severity, Status
+
+    open_f = Finding(
+        id="A", module="m", severity=Severity.HIGH,
+        title="t", description="d", remediation="r",
+    )
+    supp_f = Finding(
+        id="B", module="m", severity=Severity.HIGH,
+        title="t", description="d", remediation="r", status=Status.SUPPRESSED,
+    )
+    payload = json.loads(write_json([open_f, supp_f], tmp_path).read_text(encoding="utf-8"))
+    assert payload["summary"]["High"] == 1   # suppressed one is not counted as open
+    assert payload["suppressed"] == 1
+
+
 def test_write_sarif_is_valid_shape(sample_findings, tmp_path):
     path = write_sarif(sample_findings, tmp_path)
     doc = json.loads(path.read_text(encoding="utf-8"))

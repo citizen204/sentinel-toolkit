@@ -7,7 +7,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .finding import Finding, Severity
+from .finding import Finding, Severity, Status
 
 _SEVERITY_ORDER = [
     Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO
@@ -16,8 +16,15 @@ _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 
 def summarize(findings: list[Finding]) -> dict[str, int]:
-    counts = Counter(f.severity.value for f in findings)
+    """Severity counts of open (non-suppressed) findings."""
+    counts = Counter(
+        f.severity.value for f in findings if f.status != Status.SUPPRESSED
+    )
     return {sev.value: counts.get(sev.value, 0) for sev in _SEVERITY_ORDER}
+
+
+def count_suppressed(findings: list[Finding]) -> int:
+    return sum(1 for f in findings if f.status == Status.SUPPRESSED)
 
 
 def _timestamped_path(output_dir: str | Path, ext: str, when: datetime) -> Path:
@@ -32,6 +39,7 @@ def write_json(findings: list[Finding], output_dir: str | Path) -> Path:
     payload = {
         "generated_at": when.isoformat(),
         "summary": summarize(findings),
+        "suppressed": count_suppressed(findings),
         "findings": [f.model_dump(mode="json") for f in findings],
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -49,6 +57,7 @@ def write_html(findings: list[Finding], output_dir: str | Path) -> Path:
     html = template.render(
         generated_at=when.isoformat(),
         summary=summarize(findings),
+        suppressed=count_suppressed(findings),
         findings=findings,
     )
     path.write_text(html, encoding="utf-8")
@@ -114,6 +123,10 @@ def write_sarif(findings: list[Finding], output_dir: str | Path) -> Path:
         if f.resource:
             result["locations"] = [
                 {"logicalLocations": [{"fullyQualifiedName": f.resource}]}
+            ]
+        if f.status == Status.SUPPRESSED:
+            result["suppressions"] = [
+                {"kind": "external", "justification": f.suppression_reason or "accepted risk"}
             ]
         results.append(result)
 
