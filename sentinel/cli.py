@@ -210,6 +210,29 @@ def init_config(
     typer.echo(f"Wrote sample config to {target}")
 
 
+@app.command("diff")
+def diff(
+    old: str = typer.Argument(..., help="Path to the older report.json."),
+    new: str = typer.Argument(..., help="Path to the newer report.json."),
+) -> None:
+    """Compare two JSON reports: new, resolved, and persisting findings."""
+    import json
+
+    from sentinel.core.diff import diff_reports
+
+    old_report = json.loads(Path(old).read_text(encoding="utf-8"))
+    new_report = json.loads(Path(new).read_text(encoding="utf-8"))
+    result = diff_reports(old_report, new_report)
+
+    typer.echo(f"New:        {len(result['new'])}")
+    typer.echo(f"Resolved:   {len(result['resolved'])}")
+    typer.echo(f"Persisting: {len(result['persisting'])}")
+    for f in result["new"]:
+        typer.echo(f"  + [{f.get('severity')}] {f.get('id')}  {f.get('resource', '')}")
+    for f in result["resolved"]:
+        typer.echo(f"  - [{f.get('severity')}] {f.get('id')}  {f.get('resource', '')}")
+
+
 def main() -> None:
     app()
 
