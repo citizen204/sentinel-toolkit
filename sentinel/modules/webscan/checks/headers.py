@@ -42,7 +42,18 @@ def check_security_headers(url: str, session=None, timeout: int = 10) -> list[Fi
                     description=f"The response from {url} does not set the {header} header.",
                     remediation=remediation,
                     asset=Asset(provider="web", type="url", id=url),
-                    evidence={"url": url, "header": header},
+                    evidence={
+                        "url": url,
+                        "header": header,
+                        "status_code": resp.status_code,
+                        "headers_present": sorted(present),
+                    },
+                    api="HTTP GET",
+                    rationale=(
+                        f"The response to GET {url} (HTTP {resp.status_code}) did not include "
+                        f"a {header} header, so browsers fall back to unsafe defaults."
+                    ),
+                    verify=f"curl -sI {url} | grep -i '{header}'",
                     resource=url,
                 )
             )

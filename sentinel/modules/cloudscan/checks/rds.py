@@ -34,7 +34,16 @@ def check_unencrypted_databases(session, regions=None, account_id=None) -> list[
                         provider="aws", type="rds_instance", id=db_id,
                         region=region, account_id=account_id,
                     ),
-                    evidence=evidence,
+                    evidence={**evidence, "storage_encrypted": False},
+                    api="rds:DescribeDBInstances",
+                    rationale=(
+                        "DescribeDBInstances reports StorageEncrypted=false, so the database "
+                        "storage, snapshots, and backups are unencrypted at rest."
+                    ),
+                    verify=(
+                        f"aws rds describe-db-instances --db-instance-identifier {db_id}"
+                        + (f" --region {region}" if region else "")
+                    ),
                     resource=db_id,
                 )
             )

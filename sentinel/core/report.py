@@ -113,13 +113,23 @@ def write_sarif(findings: list[Finding], output_dir: str | Path) -> Path:
 
     results = []
     for f in findings:
+        message = [f.description]
+        if f.rationale:
+            message.append(f"Why: {f.rationale}")
+        message.append(f"Remediation: {f.remediation}")
+        if f.verify:
+            message.append(f"Verify: {f.verify}")
+
         result = {
             "ruleId": f.id,
             "ruleIndex": rule_index[f.id],
             "level": _SARIF_LEVEL[f.severity],
-            "message": {"text": f"{f.description}\nRemediation: {f.remediation}"},
+            "message": {"text": "\n".join(message)},
             "partialFingerprints": {"sentinelFingerprint/v1": f.dedupe_key},
         }
+        properties = {k: v for k, v in (("api", f.api), ("verify", f.verify)) if v}
+        if properties:
+            result["properties"] = properties
         if f.resource:
             result["locations"] = [
                 {"logicalLocations": [{"fullyQualifiedName": f.resource}]}

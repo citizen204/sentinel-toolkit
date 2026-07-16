@@ -54,7 +54,19 @@ def check_port_scan(flows, threshold: int = DEFAULT_PORT_SCAN_THRESHOLD) -> list
                     description=f"{src} connected to {len(ports)} distinct ports.",
                     remediation="Investigate the source host; block it if unauthorized.",
                     asset=Asset(provider="network", type="ip", id=src),
-                    evidence={"src_ip": src, "distinct_ports": len(ports)},
+                    evidence={
+                        "src_ip": src,
+                        "distinct_ports": len(ports),
+                        "threshold": threshold,
+                        "ports_sample": sorted(ports)[:20],
+                    },
+                    api="network flow log",
+                    rationale=(
+                        f"{src} touched {len(ports)} distinct destination ports, at or above "
+                        f"the threshold of {threshold}. Fanning out across many ports on a "
+                        f"host is characteristic of service discovery, not normal traffic."
+                    ),
+                    verify=f"Review the flow log / capture for connections from {src}.",
                     resource=src,
                 )
             )
@@ -76,7 +88,19 @@ def check_host_sweep(flows, threshold: int = DEFAULT_HOST_SWEEP_THRESHOLD) -> li
                     description=f"{src} contacted {len(hosts)} distinct hosts.",
                     remediation="Investigate the source host for reconnaissance activity.",
                     asset=Asset(provider="network", type="ip", id=src),
-                    evidence={"src_ip": src, "distinct_hosts": len(hosts)},
+                    evidence={
+                        "src_ip": src,
+                        "distinct_hosts": len(hosts),
+                        "threshold": threshold,
+                        "hosts_sample": sorted(hosts)[:20],
+                    },
+                    api="network flow log",
+                    rationale=(
+                        f"{src} contacted {len(hosts)} distinct hosts, at or above the "
+                        f"threshold of {threshold}. Sweeping many hosts is characteristic "
+                        f"of network reconnaissance."
+                    ),
+                    verify=f"Review the flow log / capture for connections from {src}.",
                     resource=src,
                 )
             )

@@ -36,6 +36,9 @@ sharing common plumbing:
   module, and the CLI picks it up with zero wiring changes.
 - 🎯 **Remediation-first** — a finding that says *what's* wrong but not *how* to fix it is only half
   done. Every finding carries a concrete remediation step.
+- 🔍 **Audit-grade evidence** — every finding answers *which API* produced it, *what was observed*,
+  *why that is a failure*, and *how to verify the fix* — with the account and region attached.
+  A failed check is reported as unassessed, never as a pass.
 - 🧱 **One model to rule them all** — cloud, log, web, and network results all become the same
   `Finding`, bound to a structured **`Asset`** (provider/account/region/type/id) instead of a bare
   string — the difference between a flat report and a real security tool.
@@ -128,8 +131,12 @@ Every finding is structured and tells you **how to fix it**:
   "severity": "High",
   "title": "Publicly accessible S3 bucket",
   "description": "S3 bucket 'prod-backups' grants access to a public group (AllUsers).",
+  "api": "s3:GetBucketAcl",
+  "rationale": "The bucket ACL grants to AllUsers; that group resolves to anyone on the internet.",
+  "evidence": { "bucket": "prod-backups", "public_grantees": ["...AllUsers"] },
   "remediation": "Remove public ACL grants and enable S3 Block Public Access.",
-  "resource": "prod-backups"
+  "verify": "aws s3api get-bucket-acl --bucket prod-backups",
+  "asset": { "provider": "aws", "type": "s3_bucket", "id": "prod-backups", "account_id": "123456789012" }
 }
 ```
 

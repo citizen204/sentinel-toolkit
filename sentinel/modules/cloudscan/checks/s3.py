@@ -28,22 +28,23 @@ def _bucket_names(s3) -> list[str]:
     return [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
 
 
-def _is_public(grants: list[dict]) -> bool:
-    for grant in grants:
-        uri = grant.get("Grantee", {}).get("URI", "")
-        if uri in _PUBLIC_URIS:
-            return True
-    return False
+def _public_grant_uris(grants: list[dict]) -> list[str]:
+    """The public grantee URIs present on a bucket ACL."""
+    return [
+        grant["Grantee"]["URI"]
+        for grant in grants
+        if grant.get("Grantee", {}).get("URI") in _PUBLIC_URIS
+    ]
 
 
 def check_public_buckets(session, account_id: str | None = None) -> list[Finding]:
     """Flag S3 buckets whose ACL grants access to a public group."""
     s3 = session.client("s3")
     findings: list[Finding] = []
-    for bucket in s3.list_buckets().get("Buckets", []):
-        name = bucket["Name"]
+    for name in _bucket_names(s3):
         grants = s3.get_bucket_acl(Bucket=name).get("Grants", [])
-        if _is_public(grants):
+        public_uris = _public_grant_uris(grants)
+        if public_uris:
             findings.append(
                 build_finding(
                     "CLOUD-S3-PUBLIC",
@@ -53,7 +54,17 @@ def check_public_buckets(session, account_id: str | None = None) -> list[Finding
                     ),
                     remediation="Remove public ACL grants and enable S3 Block Public Access.",
                     asset=_bucket_asset(name, account_id),
-                    evidence={"bucket": name, "grants": grants},
+                    evidence={
+                        "bucket": name,
+                        "grants": grants,
+                        "public_grantees": public_uris,
+                    },
+                    api="s3:GetBucketAcl",
+                    rationale=(
+                        f"The bucket ACL grants to {', '.join(public_uris)}; those groups "
+                        f"resolve to anyone on the internet, so the bucket is public."
+                    ),
+                    verify=f"aws s3api get-bucket-acl --bucket {name}",
                     resource=name,
                 )
             )
@@ -79,7 +90,17 @@ def check_bucket_encryption(session, account_id: str | None = None) -> list[Find
                     description=f"S3 bucket '{name}' has no default encryption configured.",
                     remediation="Enable default SSE-S3 or SSE-KMS encryption on the bucket.",
                     asset=_bucket_asset(name, account_id),
-                    evidence={"bucket": name},
+                    evidence={
+                        "bucket": name,
+                        "error_code": "ServerSideEncryptionConfigurationNotFoundError",
+                    },
+                    api="s3:GetBucketEncryption",
+                    rationale=(
+                        "GetBucketEncryption returned "
+                        "ServerSideEncryptionConfigurationNotFoundError, meaning no default "
+                        "encryption rule exists, so new objects can be stored unencrypted."
+                    ),
+                    verify=f"aws s3api get-bucket-encryption --bucket {name}",
                     resource=name,
                 )
             )
@@ -100,6 +121,12 @@ def check_bucket_versioning(session, account_id: str | None = None) -> list[Find
                     remediation="Enable versioning to protect against overwrite and deletion.",
                     asset=_bucket_asset(name, account_id),
                     evidence={"bucket": name, "versioning": status or "Disabled"},
+                    api="s3:GetBucketVersioning",
+                    rationale=(
+                        f"Versioning Status is '{status or 'unset'}' rather than 'Enabled', "
+                        f"so an overwrite or delete is unrecoverable."
+                    ),
+                    verify=f"aws s3api get-bucket-versioning --bucket {name}",
                     resource=name,
                 )
             )
@@ -163,7 +190,16 @@ def check_bucket_public_access_block(
                     "bucket_bpa": bucket_blocked,
                     "account_bpa": account_blocked,
                     "effective_bpa": effective,
+                    "required_settings": list(_BPA_KEYS),
                 },
+                api="s3:GetPublicAccessBlock + s3:GetAccountPublicAccessBlock",
+                rationale=(
+                    f"All four Block Public Access settings must be on at the bucket or the "
+                    f"account level; bucket-level fully blocked = {bucket_blocked}, "
+                    f"account-level = {account_blocked}, so nothing prevents a public "
+                    f"ACL or policy being applied."
+                ),
+                verify=f"aws s3api get-public-access-block --bucket {name}",
                 resource=name,
             )
         )
