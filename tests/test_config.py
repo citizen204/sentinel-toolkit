@@ -29,6 +29,27 @@ def test_load_from_yaml(tmp_path):
     assert cfg.output_dir == "out"
 
 
+def test_load_profile_and_rule_overrides(tmp_path):
+    from sentinel.core.finding import Severity
+
+    cfg_file = tmp_path / "p.yaml"
+    cfg_file.write_text(
+        "profile: strict\n"
+        "rules:\n"
+        "  LOG-BRUTEFORCE:\n"
+        "    threshold: 20\n"
+        "    severity: Critical\n"
+        "  CLOUD-S3-NO-VERSIONING:\n"
+        "    enabled: false\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_file)
+    assert cfg.profile == "strict"
+    assert cfg.threshold_for("LOG-BRUTEFORCE", 5) == 20
+    assert cfg.rules["LOG-BRUTEFORCE"].severity is Severity.CRITICAL
+    assert cfg.rules["CLOUD-S3-NO-VERSIONING"].enabled is False
+
+
 def test_load_aws_accounts(tmp_path):
     cfg_file = tmp_path / "a.yaml"
     cfg_file.write_text(

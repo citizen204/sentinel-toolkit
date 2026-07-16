@@ -223,8 +223,19 @@ suppressions:                          # accepted risks: kept in the report, mar
     created_by: chilton                # audit trail
     ticket: SEC-123
     expires: 2027-01-01                # optional; suppression lapses after this date
+profile: baseline                      # baseline (rule defaults) | strict (everything on)
+rules:                                 # per-rule overrides
+  LOG-BRUTEFORCE:
+    threshold: 10                      # tune threshold-based rules
+  CLOUD-S3-NO-VERSIONING:
+    enabled: false                     # turn a rule off
+  CLOUD-IAM-NO-MFA:
+    severity: High                     # re-rate for your risk model
 output_dir: reports
 ```
+
+Scanner and check failures are never hidden by profiles or rule config — only real
+findings can be tuned away.
 
 ## ✅ Testing & CI
 

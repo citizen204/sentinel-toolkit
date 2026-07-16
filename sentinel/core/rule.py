@@ -24,6 +24,10 @@ class Rule(BaseModel):
     confidence: Confidence = Confidence.HIGH
     default_enabled: bool = True
     description: str = ""
+    # Compliance control ids this rule maps to (e.g. a CIS benchmark control).
+    # Intentionally empty until a verified mapping matrix is added — inventing
+    # control numbers would be false precision.
+    compliance: list[str] = Field(default_factory=list)
 
 
 RULES: dict[str, Rule] = {}
@@ -36,6 +40,43 @@ def register_rule(rule: Rule) -> Rule:
 
 def get_rule(rule_id: str) -> Rule:
     return RULES[rule_id]
+
+
+def rule_enabled(rule_id: str, config) -> bool:
+    """Whether a rule should report, given the profile and per-rule overrides.
+
+    Precedence: an explicit per-rule `enabled` wins; otherwise the profile
+    decides ("strict" enables everything, "baseline" honours the rule's own
+    `default_enabled`). Ids that aren't registered rules — e.g. scanner/check
+    error findings — are always kept, so config can never hide failures.
+    """
+    settings = config.rule_settings(rule_id) if hasattr(config, "rule_settings") else None
+    if settings is not None and settings.enabled is not None:
+        return settings.enabled
+
+    rule = RULES.get(rule_id)
+    if rule is None:
+        return True
+    if getattr(config, "profile", "baseline") == "strict":
+        return True
+    return rule.default_enabled
+
+
+def apply_rule_config(findings: list[Finding], config) -> list[Finding]:
+    """Drop findings from disabled rules and apply per-rule severity overrides."""
+    kept: list[Finding] = []
+    for finding in findings:
+        if not rule_enabled(finding.id, config):
+            continue
+        settings = (
+            config.rule_settings(finding.id)
+            if hasattr(config, "rule_settings")
+            else None
+        )
+        if settings is not None and settings.severity is not None:
+            finding.severity = settings.severity
+        kept.append(finding)
+    return kept
 
 
 def build_finding(

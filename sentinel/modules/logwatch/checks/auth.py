@@ -9,12 +9,14 @@ from sentinel.core.rule import build_finding
 
 from .. import rules  # noqa: F401 - registers logwatch rules
 
+DEFAULT_BRUTEFORCE_THRESHOLD = 5
+
 _IP = r"(\d{1,3}(?:\.\d{1,3}){3})"
 _FAILED = re.compile(r"Failed password for (?:invalid user )?\S+ from " + _IP)
 _ACCEPTED_PRIV = re.compile(r"Accepted password for (root|admin) from " + _IP)
 
 
-def check_bruteforce(lines, threshold: int = 5) -> list[Finding]:
+def check_bruteforce(lines, threshold: int = DEFAULT_BRUTEFORCE_THRESHOLD) -> list[Finding]:
     """Flag source IPs with many failed SSH logins (possible brute force)."""
     counts: dict[str, int] = defaultdict(int)
     for line in lines:
