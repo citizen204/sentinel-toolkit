@@ -17,6 +17,9 @@ All notable changes to this project are documented here. The format is based on
   established up front via STS `GetCallerIdentity`, and every AWS asset is now attributed to its
   account. `dedupe_key` includes the account, so the same resource id in two accounts no longer
   collides.
+- **Multi-account auditing**: configure `aws_accounts: [{role_arn, regions}]` and Sentinel
+  assumes each role in turn (`sts:AssumeRole`), attributing findings to each account. An
+  unreachable account is reported as a finding; the remaining accounts still get scanned.
 - **Precise suppressions**: narrow by `dedupe_key`, `rule`, `resource`, `account_id`, `region`,
   `asset_type`, or `provider`, with a `created_by` / `created_at` / `ticket` audit trail. A
   criteria-less suppression now matches nothing instead of hiding the whole report.

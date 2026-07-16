@@ -105,6 +105,11 @@ docker run --rm -v "$PWD/reports:/work/reports" sentinel scan-all
 `cloudscan` needs only read-only AWS permissions — a least-privilege policy is in
 [docs/aws-iam-policy.json](docs/aws-iam-policy.json).
 
+**Auditing a whole organisation:** create that read-only role in each account (trusting your
+audit principal), list the roles under `aws_accounts`, and give your principal `sts:AssumeRole`
+on them. Sentinel assumes each role in turn, attributes every finding to its account, and keeps
+scanning the remaining accounts if one is unreachable.
+
 ## 🎯 Usage
 
 ```console
@@ -197,9 +202,13 @@ Generate a starter file with `sentinel init-config`, then edit:
 ```yaml
 # sentinel.yaml
 aws_profile: my-audit-profile          # cloudscan
-aws_regions:                           # cloudscan — scan security groups per region
+aws_regions:                           # cloudscan — regions to scan
   - us-east-1
   - ap-southeast-2
+aws_accounts:                          # optional: audit many accounts via AssumeRole
+  - role_arn: arn:aws:iam::111111111111:role/SentinelAudit
+    regions: [us-east-1, ap-southeast-2]
+  - role_arn: arn:aws:iam::222222222222:role/SentinelAudit
 target_url: https://app.example.com    # webscan
 log_paths:                             # logwatch
   - /var/log/auth.log

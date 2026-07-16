@@ -17,6 +17,7 @@ from .checks.s3 import (
     check_public_buckets,
 )
 from .checks.security_groups import check_open_security_groups
+from .session import assume_role_session
 
 
 def _check_error(name: str, exc: Exception) -> list[Finding]:
@@ -44,61 +45,79 @@ def _run_check(name: str, fn) -> list[Finding]:
         return _check_error(name, exc)
 
 
+def _scan_session(session, regions: list[str]) -> list[Finding]:
+    """Run every cloudscan check against one account's session."""
+    findings: list[Finding] = []
+
+    # Establish identity first: it attributes every asset to an account and
+    # keeps dedupe keys stable across accounts. If it fails, say so rather
+    # than silently scanning without an account id.
+    context = None
+    try:
+        context = aws_scan_context(session, regions)
+    except Exception as exc:  # noqa: BLE001
+        findings += _check_error("scan_context", exc)
+    account = context.account_id if context else None
+
+    findings += _run_check(
+        "s3_public_buckets", lambda: check_public_buckets(session, account)
+    )
+    findings += _run_check(
+        "s3_encryption", lambda: check_bucket_encryption(session, account)
+    )
+    findings += _run_check(
+        "s3_versioning", lambda: check_bucket_versioning(session, account)
+    )
+    findings += _run_check(
+        "s3_block_public_access",
+        lambda: check_bucket_public_access_block(session, account),
+    )
+    findings += _run_check(
+        "open_security_groups",
+        lambda: check_open_security_groups(session, regions, account),
+    )
+    findings += _run_check(
+        "iam_users_without_mfa", lambda: check_users_without_mfa(session, account)
+    )
+    findings += _run_check(
+        "iam_password_policy", lambda: check_password_policy(session, account)
+    )
+    findings += _run_check("iam_admin_users", lambda: check_admin_users(session, account))
+    findings += _run_check(
+        "ebs_encryption", lambda: check_unencrypted_volumes(session, regions, account)
+    )
+    findings += _run_check(
+        "rds_encryption", lambda: check_unencrypted_databases(session, regions, account)
+    )
+    return findings
+
+
 class CloudScanner(BaseScanner):
-    """Scans an AWS account for common misconfigurations (read-only)."""
+    """Scans one or many AWS accounts for common misconfigurations (read-only).
+
+    With no `aws_accounts` configured it audits the current credentials. Given
+    `aws_accounts`, it assumes each role in turn — a failure on one account is
+    reported and the remaining accounts still get scanned.
+    """
 
     name = "cloudscan"
 
     def run(self, config) -> list[Finding]:
-        if config.aws_profile:
-            session = boto3.Session(profile_name=config.aws_profile)
-        else:
-            session = boto3.Session()
+        base = (
+            boto3.Session(profile_name=config.aws_profile)
+            if config.aws_profile
+            else boto3.Session()
+        )
+
+        if not config.aws_accounts:
+            return _scan_session(base, config.aws_regions)
 
         findings: list[Finding] = []
-
-        # Establish identity first: it attributes every asset to an account and
-        # keeps dedupe keys stable across accounts. If it fails, say so rather
-        # than silently scanning without an account id.
-        context = None
-        try:
-            context = aws_scan_context(session, config.aws_regions)
-        except Exception as exc:  # noqa: BLE001
-            findings += _check_error("scan_context", exc)
-        account = context.account_id if context else None
-
-        findings += _run_check(
-            "s3_public_buckets", lambda: check_public_buckets(session, account)
-        )
-        findings += _run_check(
-            "s3_encryption", lambda: check_bucket_encryption(session, account)
-        )
-        findings += _run_check(
-            "s3_versioning", lambda: check_bucket_versioning(session, account)
-        )
-        findings += _run_check(
-            "s3_block_public_access",
-            lambda: check_bucket_public_access_block(session, account),
-        )
-        findings += _run_check(
-            "open_security_groups",
-            lambda: check_open_security_groups(session, config.aws_regions, account),
-        )
-        findings += _run_check(
-            "iam_users_without_mfa", lambda: check_users_without_mfa(session, account)
-        )
-        findings += _run_check(
-            "iam_password_policy", lambda: check_password_policy(session, account)
-        )
-        findings += _run_check(
-            "iam_admin_users", lambda: check_admin_users(session, account)
-        )
-        findings += _run_check(
-            "ebs_encryption",
-            lambda: check_unencrypted_volumes(session, config.aws_regions, account),
-        )
-        findings += _run_check(
-            "rds_encryption",
-            lambda: check_unencrypted_databases(session, config.aws_regions, account),
-        )
+        for account in config.aws_accounts:
+            try:
+                session = assume_role_session(base, account.role_arn)
+            except Exception as exc:  # noqa: BLE001 - isolate one bad account
+                findings += _check_error(f"assume_role[{account.role_arn}]", exc)
+                continue
+            findings += _scan_session(session, account.regions or config.aws_regions)
         return findings

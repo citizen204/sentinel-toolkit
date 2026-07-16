@@ -29,6 +29,21 @@ def test_load_from_yaml(tmp_path):
     assert cfg.output_dir == "out"
 
 
+def test_load_aws_accounts(tmp_path):
+    cfg_file = tmp_path / "a.yaml"
+    cfg_file.write_text(
+        "aws_accounts:\n"
+        "  - role_arn: arn:aws:iam::111111111111:role/audit\n"
+        "    account_id: '111111111111'\n"
+        "    regions: [us-east-1, ap-southeast-2]\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_file)
+    assert len(cfg.aws_accounts) == 1
+    assert cfg.aws_accounts[0].role_arn.endswith("role/audit")
+    assert cfg.aws_accounts[0].regions == ["us-east-1", "ap-southeast-2"]
+
+
 def test_load_suppressions(tmp_path):
     cfg_file = tmp_path / "s.yaml"
     cfg_file.write_text(

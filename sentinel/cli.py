@@ -182,6 +182,13 @@ _SAMPLE_CONFIG = """\
 aws_profile: my-audit-profile          # cloudscan: AWS profile to audit
 aws_regions:                           # cloudscan: regions to scan (empty = default region)
   - us-east-1
+# Audit many accounts by assuming a role in each (omit to audit the current creds).
+# Your principal needs sts:AssumeRole on each role; each role carries the read-only
+# audit policy from docs/aws-iam-policy.json.
+# aws_accounts:
+#   - role_arn: arn:aws:iam::111111111111:role/SentinelAudit
+#     regions: [us-east-1, ap-southeast-2]
+#   - role_arn: arn:aws:iam::222222222222:role/SentinelAudit
 target_url: https://app.example.com    # webscan: URL to check
 log_paths:                             # logwatch: auth logs to analyse
   - /var/log/auth.log
