@@ -188,9 +188,15 @@ log_paths:                             # logwatch: auth logs to analyse
 capture_file: capture.pcap             # netmon: a flow log or a .pcap/.pcapng
 ignore_ids: []                         # hard-drop findings by rule id
 suppressions:                          # accepted risks: kept in the report, marked suppressed
+  # narrow by any of: dedupe_key / rule / resource / account_id / region /
+  # asset_type / provider. At least one is required (a criteria-less
+  # suppression matches nothing rather than hiding the whole report).
   - rule: CLOUD-IAM-NO-MFA
-    resource: deploy-bot               # optional; omit to match any resource
+    resource: deploy-bot
+    account_id: "123456789012"         # pin to one account so it can't match elsewhere
     reason: service account, MFA not applicable
+    created_by: chilton
+    ticket: SEC-123
     expires: 2027-01-01                # optional; suppression lapses after this date
 output_dir: reports
 """

@@ -76,6 +76,21 @@ def test_dedupe_key_is_stable_and_serialized():
     assert data["dedupe_key"] == key  # computed field is serialized
 
 
+def test_dedupe_key_includes_account():
+    from sentinel.core.asset import Asset
+
+    def _in_account(account_id):
+        kwargs = _valid_kwargs()
+        kwargs["resource"] = "same-name"
+        kwargs["asset"] = Asset(
+            provider="aws", type="iam_user", id="same-name", account_id=account_id
+        )
+        return Finding(**kwargs)
+
+    # the same resource id in two accounts must not collide
+    assert _in_account("111111111111").dedupe_key != _in_account("222222222222").dedupe_key
+
+
 def test_asset_can_be_attached():
     from sentinel.core.asset import Asset
     kwargs = _valid_kwargs()

@@ -34,7 +34,7 @@ def _iter_security_groups(ec2):
         yield from page.get("SecurityGroups", [])
 
 
-def _scan_group(sg: dict, region: str | None) -> list[Finding]:
+def _scan_group(sg: dict, region: str | None, account_id: str | None = None) -> list[Finding]:
     group_id = sg["GroupId"]
     findings: list[Finding] = []
     for perm in sg.get("IpPermissions", []):
@@ -62,7 +62,7 @@ def _scan_group(sg: dict, region: str | None) -> list[Finding]:
                     ),
                     asset=Asset(
                         provider="aws", type="security_group",
-                        id=group_id, region=region,
+                        id=group_id, region=region, account_id=account_id,
                     ),
                     evidence=evidence,
                     resource=group_id,
@@ -71,7 +71,7 @@ def _scan_group(sg: dict, region: str | None) -> list[Finding]:
     return findings
 
 
-def check_open_security_groups(session, regions=None) -> list[Finding]:
+def check_open_security_groups(session, regions=None, account_id=None) -> list[Finding]:
     """Flag security groups allowing 0.0.0.0/0 or ::/0 inbound on a risky port.
 
     When `regions` is given, every region is scanned; otherwise the session's
@@ -81,5 +81,5 @@ def check_open_security_groups(session, regions=None) -> list[Finding]:
     for region in (regions or [None]):
         ec2 = session.client("ec2", region_name=region) if region else session.client("ec2")
         for sg in _iter_security_groups(ec2):
-            findings.extend(_scan_group(sg, region))
+            findings.extend(_scan_group(sg, region, account_id))
     return findings

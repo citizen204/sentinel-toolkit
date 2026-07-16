@@ -54,15 +54,17 @@ class Finding(BaseModel):
     def dedupe_key(self) -> str:
         """Stable id for a logically-identical finding across scans.
 
-        Includes the rule, module, resource, title, and stable identifying
-        evidence (region/port/cidr/header) so distinct issues on the same
-        resource don't collide — while volatile counts are excluded so a
-        re-scan of the same issue keeps the same key.
+        Includes the rule, module, account, resource, title, and stable
+        identifying evidence (region/port/cidr/header) so distinct issues — even
+        the same resource id in two different accounts — never collide. Volatile
+        counts are excluded so a re-scan of the same issue keeps the same key.
         """
         ev = self.evidence
+        account = self.asset.account_id if self.asset else None
+        region = (self.asset.region if self.asset else None) or ev.get("region", "")
         parts = [
-            self.id, self.module, self.resource or "", self.title,
-            str(ev.get("region", "")), str(ev.get("port", "")),
+            self.id, self.module, account or "", self.resource or "", self.title,
+            str(region or ""), str(ev.get("port", "")),
             str(ev.get("cidr", "")), str(ev.get("header", "")),
         ]
         return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()

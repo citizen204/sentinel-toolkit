@@ -13,6 +13,14 @@ All notable changes to this project are documented here. The format is based on
 - `sentinel diff <old.json> <new.json>` — new / resolved / persisting findings across scans,
   matched by stable `dedupe_key`.
 
+- **Scan context**: `ScanContext(account_id, partition, regions, started_at, tool_version)` is
+  established up front via STS `GetCallerIdentity`, and every AWS asset is now attributed to its
+  account. `dedupe_key` includes the account, so the same resource id in two accounts no longer
+  collides.
+- **Precise suppressions**: narrow by `dedupe_key`, `rule`, `resource`, `account_id`, `region`,
+  `asset_type`, or `provider`, with a `created_by` / `created_at` / `ticket` audit trail. A
+  criteria-less suppression now matches nothing instead of hiding the whole report.
+
 ### Fixed
 - **S3 encryption check no longer swallows unexpected AWS errors.** `AccessDenied` and similar
   now surface as `CLOUD-CHECK-ERROR` instead of silently reporting a clean bucket (false negative).
