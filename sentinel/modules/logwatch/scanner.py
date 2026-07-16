@@ -5,7 +5,11 @@ from pathlib import Path
 from sentinel.core.finding import Finding
 from sentinel.core.scanner import BaseScanner
 
-from .checks.auth import check_bruteforce, check_root_login
+from .checks.auth import (
+    DEFAULT_BRUTEFORCE_THRESHOLD,
+    check_bruteforce,
+    check_root_login,
+)
 
 
 class LogwatchScanner(BaseScanner):
@@ -22,6 +26,13 @@ class LogwatchScanner(BaseScanner):
                     p.read_text(encoding="utf-8", errors="ignore").splitlines()
                 )
         findings: list[Finding] = []
-        findings.extend(check_bruteforce(lines))
+        findings.extend(
+            check_bruteforce(
+                lines,
+                threshold=config.threshold_for(
+                    "LOG-BRUTEFORCE", DEFAULT_BRUTEFORCE_THRESHOLD
+                ),
+            )
+        )
         findings.extend(check_root_login(lines))
         return findings

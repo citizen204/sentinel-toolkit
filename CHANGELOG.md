@@ -17,6 +17,10 @@ All notable changes to this project are documented here. The format is based on
   established up front via STS `GetCallerIdentity`, and every AWS asset is now attributed to its
   account. `dedupe_key` includes the account, so the same resource id in two accounts no longer
   collides.
+- **Per-rule configuration and profiles**: `profile: baseline | strict` plus per-rule
+  `enabled` / `severity` / `threshold` overrides. Error findings (scanner/check failures) are
+  never filtered by config. `Rule` gains a `compliance` field as the hook for a future,
+  verified control mapping.
 - **Multi-account auditing**: configure `aws_accounts: [{role_arn, regions}]` and Sentinel
   assumes each role in turn (`sts:AssumeRole`), attributing findings to each account. An
   unreachable account is reported as a finding; the remaining accounts still get scanned.

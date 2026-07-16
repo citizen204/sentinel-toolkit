@@ -5,7 +5,13 @@ from pathlib import Path
 from sentinel.core.finding import Finding
 from sentinel.core.scanner import BaseScanner
 
-from .checks.flows import check_host_sweep, check_port_scan, parse_flow_file
+from .checks.flows import (
+    DEFAULT_HOST_SWEEP_THRESHOLD,
+    DEFAULT_PORT_SCAN_THRESHOLD,
+    check_host_sweep,
+    check_port_scan,
+    parse_flow_file,
+)
 
 
 class NetmonScanner(BaseScanner):
@@ -29,6 +35,20 @@ class NetmonScanner(BaseScanner):
         else:
             flows = parse_flow_file(path)
         findings: list[Finding] = []
-        findings.extend(check_port_scan(flows))
-        findings.extend(check_host_sweep(flows))
+        findings.extend(
+            check_port_scan(
+                flows,
+                threshold=config.threshold_for(
+                    "NET-PORT-SCAN", DEFAULT_PORT_SCAN_THRESHOLD
+                ),
+            )
+        )
+        findings.extend(
+            check_host_sweep(
+                flows,
+                threshold=config.threshold_for(
+                    "NET-HOST-SWEEP", DEFAULT_HOST_SWEEP_THRESHOLD
+                ),
+            )
+        )
         return findings

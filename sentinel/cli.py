@@ -9,6 +9,7 @@ from sentinel import modules  # noqa: F401  (imports register future scanners)
 from sentinel.core import report as report_mod
 from sentinel.core.config import load_config
 from sentinel.core.finding import Finding, Severity
+from sentinel.core.rule import apply_rule_config
 from sentinel.core.scanner import all_scanners
 from sentinel.core.suppression import apply_suppressions
 
@@ -148,6 +149,7 @@ def scan_all(
         typer.echo(str(exc))
         raise typer.Exit(code=1)
     findings = run_scanners(selected, cfg)
+    findings = apply_rule_config(findings, cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
     findings = apply_suppressions(findings, cfg.suppressions)
     _emit_reports(findings, output_dir or cfg.output_dir, fmt)
@@ -172,6 +174,7 @@ def scan(
         raise typer.Exit(code=1)
     cfg = load_config(config)
     findings = scanners[name]().run(cfg)
+    findings = apply_rule_config(findings, cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
     findings = apply_suppressions(findings, cfg.suppressions)
     _emit_reports(findings, output_dir or cfg.output_dir, fmt)
@@ -205,6 +208,14 @@ suppressions:                          # accepted risks: kept in the report, mar
     created_by: chilton
     ticket: SEC-123
     expires: 2027-01-01                # optional; suppression lapses after this date
+profile: baseline                      # baseline (rule defaults) | strict (everything on)
+rules:                                 # per-rule overrides
+  LOG-BRUTEFORCE:
+    threshold: 10                      # tune threshold-based rules to your environment
+  CLOUD-S3-NO-VERSIONING:
+    enabled: false                     # turn a rule off entirely
+  CLOUD-IAM-NO-MFA:
+    severity: High                     # re-rate for your own risk model
 output_dir: reports
 """
 

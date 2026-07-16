@@ -10,6 +10,9 @@ from sentinel.core.rule import build_finding
 
 from .. import rules  # noqa: F401 - registers netmon rules
 
+DEFAULT_PORT_SCAN_THRESHOLD = 10
+DEFAULT_HOST_SWEEP_THRESHOLD = 10
+
 
 class Flow(NamedTuple):
     src_ip: str
@@ -36,7 +39,7 @@ def parse_flow_file(path) -> list[Flow]:
     return flows
 
 
-def check_port_scan(flows, threshold: int = 10) -> list[Finding]:
+def check_port_scan(flows, threshold: int = DEFAULT_PORT_SCAN_THRESHOLD) -> list[Finding]:
     """Flag a source IP that connects to many distinct destination ports."""
     ports_by_src: dict[str, set[int]] = defaultdict(set)
     for flow in flows:
@@ -58,7 +61,7 @@ def check_port_scan(flows, threshold: int = 10) -> list[Finding]:
     return findings
 
 
-def check_host_sweep(flows, threshold: int = 10) -> list[Finding]:
+def check_host_sweep(flows, threshold: int = DEFAULT_HOST_SWEEP_THRESHOLD) -> list[Finding]:
     """Flag a source IP that contacts many distinct destination hosts."""
     hosts_by_src: dict[str, set[str]] = defaultdict(set)
     for flow in flows:
