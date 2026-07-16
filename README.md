@@ -207,9 +207,12 @@ capture_file: capture.pcap             # netmon — a flow log OR a .pcap/.pcapn
 ignore_ids:                            # hard-drop findings by rule id
   - CLOUD-IAM-NO-MFA
 suppressions:                          # accepted risks: kept in the report, marked suppressed
-  - rule: CLOUD-IAM-NO-MFA
-    resource: deploy-bot               # optional; omit to match any resource
+  - rule: CLOUD-IAM-NO-MFA             # narrow by dedupe_key / rule / resource /
+    resource: deploy-bot               #   account_id / region / asset_type / provider
+    account_id: "123456789012"         # pin to one account so it can't match elsewhere
     reason: service account, MFA not applicable
+    created_by: chilton                # audit trail
+    ticket: SEC-123
     expires: 2027-01-01                # optional; suppression lapses after this date
 output_dir: reports
 ```

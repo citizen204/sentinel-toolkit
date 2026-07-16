@@ -17,7 +17,7 @@ def _iter_users(iam):
         yield from page.get("Users", [])
 
 
-def check_users_without_mfa(session) -> list[Finding]:
+def check_users_without_mfa(session, account_id: str | None = None) -> list[Finding]:
     """Flag IAM users that have no MFA device enabled."""
     iam = session.client("iam")
     findings: list[Finding] = []
@@ -30,7 +30,10 @@ def check_users_without_mfa(session) -> list[Finding]:
                     "CLOUD-IAM-NO-MFA",
                     description=f"IAM user '{username}' has no MFA device enabled.",
                     remediation="Enable an MFA device for this IAM user.",
-                    asset=Asset(provider="aws", type="iam_user", id=username, name=username),
+                    asset=Asset(
+                        provider="aws", type="iam_user", id=username,
+                        name=username, account_id=account_id,
+                    ),
                     evidence={"user": username},
                     resource=username,
                 )
@@ -38,7 +41,7 @@ def check_users_without_mfa(session) -> list[Finding]:
     return findings
 
 
-def check_password_policy(session) -> list[Finding]:
+def check_password_policy(session, account_id: str | None = None) -> list[Finding]:
     """Flag an account that has no IAM password policy configured."""
     iam = session.client("iam")
     try:
@@ -54,14 +57,17 @@ def check_password_policy(session) -> list[Finding]:
                 remediation=(
                     "Set an IAM account password policy (length, complexity, rotation)."
                 ),
-                asset=Asset(provider="aws", type="account", id="password-policy"),
-                evidence={},
+                asset=Asset(
+                    provider="aws", type="account",
+                    id=account_id or "password-policy", account_id=account_id,
+                ),
+                evidence={"account_id": account_id},
                 resource="account-password-policy",
             )
         ]
 
 
-def check_admin_users(session) -> list[Finding]:
+def check_admin_users(session, account_id: str | None = None) -> list[Finding]:
     """Flag IAM users with AdministratorAccess attached *directly* to the user.
 
     Deliberately narrow: group/role/inline and wildcard customer-managed policies
@@ -88,7 +94,10 @@ def check_admin_users(session) -> list[Finding]:
                     remediation=(
                         "Remove direct AdministratorAccess; grant least-privilege via groups/roles."
                     ),
-                    asset=Asset(provider="aws", type="iam_user", id=username, name=username),
+                    asset=Asset(
+                        provider="aws", type="iam_user", id=username,
+                        name=username, account_id=account_id,
+                    ),
                     evidence={"user": username, "policy": _ADMIN_ARN},
                     resource=username,
                 )

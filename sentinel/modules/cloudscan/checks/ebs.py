@@ -13,7 +13,7 @@ def _iter_volumes(ec2):
         yield from page.get("Volumes", [])
 
 
-def check_unencrypted_volumes(session, regions=None) -> list[Finding]:
+def check_unencrypted_volumes(session, regions=None, account_id=None) -> list[Finding]:
     """Flag EBS volumes that are not encrypted at rest."""
     findings: list[Finding] = []
     for region in (regions or [None]):
@@ -30,7 +30,10 @@ def check_unencrypted_volumes(session, regions=None) -> list[Finding]:
                     "CLOUD-EBS-UNENCRYPTED",
                     description=f"EBS volume '{vol_id}' is not encrypted at rest.",
                     remediation="Encrypt the volume and enable EBS encryption by default.",
-                    asset=Asset(provider="aws", type="ebs_volume", id=vol_id, region=region),
+                    asset=Asset(
+                        provider="aws", type="ebs_volume", id=vol_id,
+                        region=region, account_id=account_id,
+                    ),
                     evidence=evidence,
                     resource=vol_id,
                 )

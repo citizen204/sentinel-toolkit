@@ -38,6 +38,11 @@ def test_run_aggregates_all_checks(aws_credentials):
     ids = {f.id for f in findings}
     assert {"CLOUD-S3-PUBLIC", "CLOUD-SG-OPEN-INGRESS", "CLOUD-IAM-NO-MFA"} <= ids
 
+    # every AWS asset is attributed to the scanned account (via STS scan context)
+    aws_assets = [f.asset for f in findings if f.asset and f.asset.provider == "aws"]
+    assert aws_assets
+    assert all(a.account_id for a in aws_assets)
+
 
 @mock_aws
 def test_one_failing_check_does_not_wipe_the_rest(aws_credentials, monkeypatch):

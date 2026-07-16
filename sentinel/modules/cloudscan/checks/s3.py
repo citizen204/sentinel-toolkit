@@ -18,8 +18,10 @@ _BPA_KEYS = (
 )
 
 
-def _bucket_asset(name: str) -> Asset:
-    return Asset(provider="aws", type="s3_bucket", id=name, name=name)
+def _bucket_asset(name: str, account_id: str | None = None) -> Asset:
+    return Asset(
+        provider="aws", type="s3_bucket", id=name, name=name, account_id=account_id
+    )
 
 
 def _bucket_names(s3) -> list[str]:
@@ -34,7 +36,7 @@ def _is_public(grants: list[dict]) -> bool:
     return False
 
 
-def check_public_buckets(session) -> list[Finding]:
+def check_public_buckets(session, account_id: str | None = None) -> list[Finding]:
     """Flag S3 buckets whose ACL grants access to a public group."""
     s3 = session.client("s3")
     findings: list[Finding] = []
@@ -50,7 +52,7 @@ def check_public_buckets(session) -> list[Finding]:
                         f"(AllUsers/AuthenticatedUsers)."
                     ),
                     remediation="Remove public ACL grants and enable S3 Block Public Access.",
-                    asset=_bucket_asset(name),
+                    asset=_bucket_asset(name, account_id),
                     evidence={"bucket": name, "grants": grants},
                     resource=name,
                 )
@@ -58,7 +60,7 @@ def check_public_buckets(session) -> list[Finding]:
     return findings
 
 
-def check_bucket_encryption(session) -> list[Finding]:
+def check_bucket_encryption(session, account_id: str | None = None) -> list[Finding]:
     """Flag S3 buckets without default server-side encryption."""
     s3 = session.client("s3")
     findings: list[Finding] = []
@@ -76,7 +78,7 @@ def check_bucket_encryption(session) -> list[Finding]:
                     "CLOUD-S3-NO-ENCRYPTION",
                     description=f"S3 bucket '{name}' has no default encryption configured.",
                     remediation="Enable default SSE-S3 or SSE-KMS encryption on the bucket.",
-                    asset=_bucket_asset(name),
+                    asset=_bucket_asset(name, account_id),
                     evidence={"bucket": name},
                     resource=name,
                 )
@@ -84,7 +86,7 @@ def check_bucket_encryption(session) -> list[Finding]:
     return findings
 
 
-def check_bucket_versioning(session) -> list[Finding]:
+def check_bucket_versioning(session, account_id: str | None = None) -> list[Finding]:
     """Flag S3 buckets that do not have versioning enabled."""
     s3 = session.client("s3")
     findings: list[Finding] = []
@@ -96,7 +98,7 @@ def check_bucket_versioning(session) -> list[Finding]:
                     "CLOUD-S3-NO-VERSIONING",
                     description=f"S3 bucket '{name}' does not have versioning enabled.",
                     remediation="Enable versioning to protect against overwrite and deletion.",
-                    asset=_bucket_asset(name),
+                    asset=_bucket_asset(name, account_id),
                     evidence={"bucket": name, "versioning": status or "Disabled"},
                     resource=name,
                 )
@@ -128,7 +130,9 @@ def _bucket_bpa_fully_blocked(s3, name: str) -> bool:
     return all(cfg.get(k) for k in _BPA_KEYS)
 
 
-def check_bucket_public_access_block(session) -> list[Finding]:
+def check_bucket_public_access_block(
+    session, account_id: str | None = None
+) -> list[Finding]:
     """Flag buckets not covered by Block Public Access at bucket *or* account level.
 
     Account-level BPA protects every bucket, so checking only the bucket-level
@@ -153,7 +157,7 @@ def check_bucket_public_access_block(session) -> list[Finding]:
                     "Enable all four S3 Block Public Access settings on the bucket, "
                     "or account-wide via S3 Control."
                 ),
-                asset=_bucket_asset(name),
+                asset=_bucket_asset(name, account_id),
                 evidence={
                     "bucket": name,
                     "bucket_bpa": bucket_blocked,

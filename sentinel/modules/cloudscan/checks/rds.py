@@ -13,7 +13,7 @@ def _iter_db_instances(rds):
         yield from page.get("DBInstances", [])
 
 
-def check_unencrypted_databases(session, regions=None) -> list[Finding]:
+def check_unencrypted_databases(session, regions=None, account_id=None) -> list[Finding]:
     """Flag RDS instances without storage encryption enabled."""
     findings: list[Finding] = []
     for region in (regions or [None]):
@@ -30,7 +30,10 @@ def check_unencrypted_databases(session, regions=None) -> list[Finding]:
                     "CLOUD-RDS-UNENCRYPTED",
                     description=f"RDS instance '{db_id}' does not have storage encryption enabled.",
                     remediation="Enable storage encryption (restore/recreate the instance encrypted).",
-                    asset=Asset(provider="aws", type="rds_instance", id=db_id, region=region),
+                    asset=Asset(
+                        provider="aws", type="rds_instance", id=db_id,
+                        region=region, account_id=account_id,
+                    ),
                     evidence=evidence,
                     resource=db_id,
                 )
