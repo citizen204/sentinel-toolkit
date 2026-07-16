@@ -136,6 +136,28 @@ def test_fingerprints_distinguish_same_resource_different_port(tmp_path):
     assert fps[0] != fps[1]  # same SG open on two ports must not collide
 
 
+def test_html_and_sarif_carry_audit_evidence(tmp_path):
+    from sentinel.core.finding import Finding, Severity
+
+    f = Finding(
+        id="X", module="m", severity=Severity.HIGH, title="t",
+        description="d", remediation="r",
+        api="s3:GetBucketAcl", rationale="the ACL grants AllUsers",
+        verify="aws s3api get-bucket-acl --bucket b",
+    )
+
+    html = write_html([f], tmp_path).read_text(encoding="utf-8")
+    assert "the ACL grants AllUsers" in html
+    assert "aws s3api get-bucket-acl --bucket b" in html
+    assert "s3:GetBucketAcl" in html
+
+    doc = json.loads(write_sarif([f], tmp_path).read_text(encoding="utf-8"))
+    result = doc["runs"][0]["results"][0]
+    assert "Why: the ACL grants AllUsers" in result["message"]["text"]
+    assert "Verify: aws s3api get-bucket-acl --bucket b" in result["message"]["text"]
+    assert result["properties"]["api"] == "s3:GetBucketAcl"
+
+
 def test_write_sarif_has_stable_fingerprints(sample_findings, tmp_path):
     run1 = json.loads(write_sarif(sample_findings, tmp_path).read_text(encoding="utf-8"))
     run2 = json.loads(write_sarif(sample_findings, tmp_path).read_text(encoding="utf-8"))

@@ -36,7 +36,16 @@ def check_bruteforce(lines, threshold: int = DEFAULT_BRUTEFORCE_THRESHOLD) -> li
                         "fail2ban or an equivalent rate limiter."
                     ),
                     asset=Asset(provider="host", type="ip", id=ip),
-                    evidence={"ip": ip, "failed_attempts": attempts},
+                    evidence={
+                        "ip": ip, "failed_attempts": attempts, "threshold": threshold,
+                    },
+                    api="sshd auth log",
+                    rationale=(
+                        f"{attempts} 'Failed password' lines originate from {ip}, at or above "
+                        f"the configured threshold of {threshold} — a volume characteristic of "
+                        f"credential guessing rather than user error."
+                    ),
+                    verify=f"grep 'Failed password' <auth log> | grep {ip} | wc -l",
                     resource=ip,
                 )
             )
@@ -59,7 +68,14 @@ def check_root_login(lines) -> list[Finding]:
                         "named user accounts."
                     ),
                     asset=Asset(provider="host", type="ip", id=ip),
-                    evidence={"account": account, "ip": ip},
+                    evidence={"account": account, "ip": ip, "line_type": "Accepted password"},
+                    api="sshd auth log",
+                    rationale=(
+                        f"An 'Accepted password' line for the privileged account '{account}' "
+                        f"shows a direct privileged login, which bypasses per-user "
+                        f"accountability that sudo from a named account provides."
+                    ),
+                    verify=f"grep 'Accepted password for {account}' <auth log>",
                     resource=ip,
                 )
             )

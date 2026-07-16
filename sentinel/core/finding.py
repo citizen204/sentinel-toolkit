@@ -41,6 +41,10 @@ class Finding(BaseModel):
     remediation: str
     category: str | None = None
     references: list[str] = Field(default_factory=list)
+    # --- audit trail: how this conclusion was reached ---
+    api: str | None = None        # the API/source the observation came from
+    rationale: str | None = None  # why the observed state is a failure
+    verify: str | None = None     # how to confirm the fix afterwards
     confidence: Confidence = Confidence.MEDIUM
     status: Status = Status.OPEN
     suppression_reason: str | None = None

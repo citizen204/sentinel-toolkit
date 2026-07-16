@@ -17,6 +17,11 @@ All notable changes to this project are documented here. The format is based on
   established up front via STS `GetCallerIdentity`, and every AWS asset is now attributed to its
   account. `dedupe_key` includes the account, so the same resource id in two accounts no longer
   collides.
+- **Audit-grade evidence**: every finding now carries `api` (the call it came from), `rationale`
+  (why the observed state is a failure), and `verify` (how to confirm the fix), alongside the raw
+  `evidence` fields and the account/region on its asset. Surfaced in JSON, HTML, SARIF
+  (message + properties), and the dashboard. A failed check states that its result is unknown —
+  explicitly not a pass. Tests guard that every rule in every module ships this trail.
 - **Per-rule configuration and profiles**: `profile: baseline | strict` plus per-rule
   `enabled` / `severity` / `threshold` overrides. Error findings (scanner/check failures) are
   never filtered by config. `Rule` gains a `compliance` field as the hook for a future,

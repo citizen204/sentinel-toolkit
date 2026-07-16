@@ -27,7 +27,13 @@ def _check_error(name: str, exc: Exception) -> list[Finding]:
             title=f"cloudscan check '{name}' failed",
             description=f"{type(exc).__name__}: {exc}",
             remediation="Check the AWS permissions/credentials for this check.",
-            evidence={"check": name, "error": str(exc)},
+            evidence={"check": name, "error": str(exc), "error_type": type(exc).__name__},
+            api=f"cloudscan:{name}",
+            rationale=(
+                "The check could not complete, so its result is unknown. Treat this as "
+                "unassessed — not as a pass."
+            ),
+            verify="Re-run the scan once the underlying permission/credential issue is fixed.",
             resource=name,
         )
     ]

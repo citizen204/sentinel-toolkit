@@ -34,7 +34,13 @@ def check_users_without_mfa(session, account_id: str | None = None) -> list[Find
                         provider="aws", type="iam_user", id=username,
                         name=username, account_id=account_id,
                     ),
-                    evidence={"user": username},
+                    evidence={"user": username, "mfa_devices": devices},
+                    api="iam:ListMFADevices",
+                    rationale=(
+                        f"ListMFADevices for '{username}' returned no devices, so the user's "
+                        f"console/API access is protected by a password alone."
+                    ),
+                    verify=f"aws iam list-mfa-devices --user-name {username}",
                     resource=username,
                 )
             )
@@ -61,7 +67,13 @@ def check_password_policy(session, account_id: str | None = None) -> list[Findin
                     provider="aws", type="account",
                     id=account_id or "password-policy", account_id=account_id,
                 ),
-                evidence={"account_id": account_id},
+                evidence={"account_id": account_id, "error_code": "NoSuchEntity"},
+                api="iam:GetAccountPasswordPolicy",
+                rationale=(
+                    "GetAccountPasswordPolicy returned NoSuchEntity: the account enforces no "
+                    "minimum length, complexity, reuse, or rotation requirements on passwords."
+                ),
+                verify="aws iam get-account-password-policy",
                 resource="account-password-policy",
             )
         ]
@@ -98,7 +110,17 @@ def check_admin_users(session, account_id: str | None = None) -> list[Finding]:
                         provider="aws", type="iam_user", id=username,
                         name=username, account_id=account_id,
                     ),
-                    evidence={"user": username, "policy": _ADMIN_ARN},
+                    evidence={
+                        "user": username,
+                        "policy": _ADMIN_ARN,
+                        "attached_policies": attached,
+                    },
+                    api="iam:ListAttachedUserPolicies",
+                    rationale=(
+                        f"AdministratorAccess is attached directly to '{username}', granting "
+                        f"unrestricted actions on every resource in the account."
+                    ),
+                    verify=f"aws iam list-attached-user-policies --user-name {username}",
                     resource=username,
                 )
             )

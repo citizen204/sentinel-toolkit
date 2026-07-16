@@ -22,6 +22,8 @@
     .finding.Low { border-color: #ca8a04; }
     .finding.Info { border-color: #2563eb; }
     .rem { color: #065f46; font-size: 0.9rem; }
+    .why { color: #475569; font-size: 0.9rem; }
+    .verify { color: #475569; font-size: 0.8rem; }
     .cat { display: inline-block; margin-left: 0.4rem; padding: 0.05rem 0.45rem;
            border-radius: 999px; background: #e2e8f0; color: #334155; font-size: 0.75rem; }
     .refs { font-size: 0.8rem; color: #64748b; }
@@ -54,7 +56,10 @@
           {% if f.asset.region %}<span class="refs">({{ f.asset.provider }} · {{ f.asset.region }})</span>{% endif %}
         </p>
       {% elif f.resource %}<p>Resource: <code>{{ f.resource }}</code></p>{% endif %}
+      {% if f.rationale %}<p class="why">Why: {{ f.rationale }}</p>{% endif %}
       <p class="rem">Fix: {{ f.remediation }}</p>
+      {% if f.verify %}<p class="verify">Verify: <code>{{ f.verify }}</code></p>{% endif %}
+      {% if f.api %}<p class="refs">Source: {{ f.api }}</p>{% endif %}
       {% if f.references %}
         <p class="refs">References:
           {% for ref in f.references %}<a href="{{ ref }}">{{ ref }}</a>{% if not loop.last %}, {% endif %}{% endfor %}

@@ -89,8 +89,16 @@ def build_finding(
     resource: str | None = None,
     asset: Asset | None = None,
     evidence: dict | None = None,
+    api: str | None = None,
+    rationale: str | None = None,
+    verify: str | None = None,
 ) -> Finding:
-    """Build a Finding from a registered rule plus instance-specific data."""
+    """Build a Finding from a registered rule plus instance-specific data.
+
+    `api` / `evidence` / `rationale` / `verify` together make a finding auditable:
+    where the observation came from, the raw fields seen, why that is a failure,
+    and how to confirm the fix.
+    """
     rule = RULES[rule_id]
     return Finding(
         id=rule.id,
@@ -105,4 +113,7 @@ def build_finding(
         asset=asset,
         resource=resource,
         evidence=evidence or {},
+        api=api,
+        rationale=rationale,
+        verify=verify,
     )

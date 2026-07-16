@@ -63,7 +63,19 @@ export default function FindingCard({ finding }: { finding: Finding }) {
           </p>
         )
       )}
+      {finding.rationale && (
+        <p className="mt-2 text-sm text-slate-600">Why: {finding.rationale}</p>
+      )}
       <p className="mt-2 text-sm text-emerald-700">Fix: {finding.remediation}</p>
+      {finding.verify && (
+        <p className="mt-1 text-xs text-slate-500">
+          Verify:{" "}
+          <code className="rounded bg-slate-100 px-1">{finding.verify}</code>
+        </p>
+      )}
+      {finding.api && (
+        <p className="mt-1 text-xs text-slate-400">Source: {finding.api}</p>
+      )}
       {finding.references && finding.references.length > 0 && (
         <p className="mt-1 text-xs text-slate-500">
           References:{" "}

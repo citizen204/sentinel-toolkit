@@ -65,6 +65,16 @@ def _scan_group(sg: dict, region: str | None, account_id: str | None = None) -> 
                         id=group_id, region=region, account_id=account_id,
                     ),
                     evidence=evidence,
+                    api="ec2:DescribeSecurityGroups",
+                    rationale=(
+                        f"An inbound rule permits {cidr_str} (the whole internet) to reach "
+                        f"port {port}, which exposes {label} — a remote administration "
+                        f"service — to untrusted networks."
+                    ),
+                    verify=(
+                        f"aws ec2 describe-security-groups --group-ids {group_id}"
+                        + (f" --region {region}" if region else "")
+                    ),
                     resource=group_id,
                 )
             )

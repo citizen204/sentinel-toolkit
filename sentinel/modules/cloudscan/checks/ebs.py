@@ -34,7 +34,16 @@ def check_unencrypted_volumes(session, regions=None, account_id=None) -> list[Fi
                         provider="aws", type="ebs_volume", id=vol_id,
                         region=region, account_id=account_id,
                     ),
-                    evidence=evidence,
+                    evidence={**evidence, "encrypted": False},
+                    api="ec2:DescribeVolumes",
+                    rationale=(
+                        "DescribeVolumes reports Encrypted=false, so the volume's data and "
+                        "its snapshots are stored unencrypted at rest."
+                    ),
+                    verify=(
+                        f"aws ec2 describe-volumes --volume-ids {vol_id}"
+                        + (f" --region {region}" if region else "")
+                    ),
                     resource=vol_id,
                 )
             )
