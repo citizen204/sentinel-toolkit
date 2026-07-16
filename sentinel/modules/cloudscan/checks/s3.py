@@ -66,17 +66,21 @@ def check_bucket_encryption(session) -> list[Finding]:
         try:
             s3.get_bucket_encryption(Bucket=name)
         except ClientError as exc:
-            if exc.response["Error"]["Code"] == "ServerSideEncryptionConfigurationNotFoundError":
-                findings.append(
-                    build_finding(
-                        "CLOUD-S3-NO-ENCRYPTION",
-                        description=f"S3 bucket '{name}' has no default encryption configured.",
-                        remediation="Enable default SSE-S3 or SSE-KMS encryption on the bucket.",
-                        asset=_bucket_asset(name),
-                        evidence={"bucket": name},
-                        resource=name,
-                    )
+            # Only "no encryption configured" is a finding. Anything else
+            # (AccessDenied, endpoint/region errors, ...) must surface as an
+            # error rather than silently becoming a clean result.
+            if exc.response["Error"]["Code"] != "ServerSideEncryptionConfigurationNotFoundError":
+                raise
+            findings.append(
+                build_finding(
+                    "CLOUD-S3-NO-ENCRYPTION",
+                    description=f"S3 bucket '{name}' has no default encryption configured.",
+                    remediation="Enable default SSE-S3 or SSE-KMS encryption on the bucket.",
+                    asset=_bucket_asset(name),
+                    evidence={"bucket": name},
+                    resource=name,
                 )
+            )
     return findings
 
 

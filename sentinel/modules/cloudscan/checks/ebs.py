@@ -7,12 +7,18 @@ from sentinel.core.rule import build_finding
 from .. import rules  # noqa: F401 - registers cloudscan rules
 
 
+def _iter_volumes(ec2):
+    """Yield every EBS volume, paginating so large accounts are fully covered."""
+    for page in ec2.get_paginator("describe_volumes").paginate():
+        yield from page.get("Volumes", [])
+
+
 def check_unencrypted_volumes(session, regions=None) -> list[Finding]:
     """Flag EBS volumes that are not encrypted at rest."""
     findings: list[Finding] = []
     for region in (regions or [None]):
         ec2 = session.client("ec2", region_name=region) if region else session.client("ec2")
-        for vol in ec2.describe_volumes().get("Volumes", []):
+        for vol in _iter_volumes(ec2):
             if vol.get("Encrypted", False):
                 continue
             vol_id = vol["VolumeId"]
