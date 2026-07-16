@@ -70,6 +70,23 @@ def test_block_public_access_flagged_when_absent(aws_credentials):
 
 
 @mock_aws
+def test_account_level_bpa_prevents_false_positive(aws_credentials):
+    session = boto3.Session(region_name="us-east-1")
+    session.client("s3").create_bucket(Bucket="no-bucket-bpa")
+    account_id = session.client("sts").get_caller_identity()["Account"]
+    session.client("s3control").put_public_access_block(
+        AccountId=account_id,
+        PublicAccessBlockConfiguration={
+            "BlockPublicAcls": True, "IgnorePublicAcls": True,
+            "BlockPublicPolicy": True, "RestrictPublicBuckets": True,
+        },
+    )
+
+    # account-level BPA covers every bucket → no finding despite no bucket-level BPA
+    assert check_bucket_public_access_block(session) == []
+
+
+@mock_aws
 def test_encryption_flagged_when_absent(aws_credentials):
     session = boto3.Session(region_name="us-east-1")
     s3 = session.client("s3")

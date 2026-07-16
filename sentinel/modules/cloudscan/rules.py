@@ -58,7 +58,9 @@ S3_NO_BPA = register_rule(Rule(
     id="CLOUD-S3-NO-BPA", module="cloudscan", severity=Severity.MEDIUM,
     category="Data Exposure", confidence=Confidence.HIGH,
     title="S3 bucket without Block Public Access",
-    description="S3 bucket does not fully enable S3 Block Public Access.",
+    description=(
+        "S3 bucket is not covered by Block Public Access at bucket or account level."
+    ),
     references=[
         "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
     ],
@@ -79,8 +81,13 @@ IAM_NO_PASSWORD_POLICY = register_rule(Rule(
 IAM_ADMIN_POLICY = register_rule(Rule(
     id="CLOUD-IAM-ADMIN-POLICY", module="cloudscan", severity=Severity.HIGH,
     category="Access Control", confidence=Confidence.HIGH,
-    title="IAM user with AdministratorAccess attached",
-    description="IAM user has the AdministratorAccess managed policy attached directly.",
+    title="IAM user with AdministratorAccess attached directly",
+    description=(
+        "IAM user has the AdministratorAccess managed policy attached directly to the "
+        "user. Scope: direct user attachment only — privileges granted via groups, "
+        "roles, inline policies, or wildcard customer-managed policies are not "
+        "evaluated (that needs effective-privilege analysis)."
+    ),
     references=["https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html"],
 ))
 

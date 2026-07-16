@@ -104,27 +104,63 @@ def check_bucket_versioning(session) -> list[Finding]:
     return findings
 
 
+def _account_bpa_fully_blocked(session) -> bool:
+    """Whether account-level S3 Block Public Access blocks all four vectors."""
+    account_id = session.client("sts").get_caller_identity()["Account"]
+    try:
+        cfg = session.client("s3control").get_public_access_block(AccountId=account_id)[
+            "PublicAccessBlockConfiguration"
+        ]
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] != "NoSuchPublicAccessBlockConfiguration":
+            raise
+        return False
+    return all(cfg.get(k) for k in _BPA_KEYS)
+
+
+def _bucket_bpa_fully_blocked(s3, name: str) -> bool:
+    try:
+        cfg = s3.get_public_access_block(Bucket=name)["PublicAccessBlockConfiguration"]
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] != "NoSuchPublicAccessBlockConfiguration":
+            raise
+        return False
+    return all(cfg.get(k) for k in _BPA_KEYS)
+
+
 def check_bucket_public_access_block(session) -> list[Finding]:
-    """Flag S3 buckets that do not fully enable Block Public Access."""
+    """Flag buckets not covered by Block Public Access at bucket *or* account level.
+
+    Account-level BPA protects every bucket, so checking only the bucket-level
+    setting would report false positives on accounts that block centrally.
+    """
     s3 = session.client("s3")
+    account_blocked = _account_bpa_fully_blocked(session)
     findings: list[Finding] = []
     for name in _bucket_names(s3):
-        try:
-            cfg = s3.get_public_access_block(Bucket=name)["PublicAccessBlockConfiguration"]
-            fully_blocked = all(cfg.get(k) for k in _BPA_KEYS)
-        except ClientError as exc:
-            if exc.response["Error"]["Code"] != "NoSuchPublicAccessBlockConfiguration":
-                raise
-            fully_blocked = False
-        if not fully_blocked:
-            findings.append(
-                build_finding(
-                    "CLOUD-S3-NO-BPA",
-                    description=f"S3 bucket '{name}' does not fully enable Block Public Access.",
-                    remediation="Enable all four S3 Block Public Access settings (bucket or account).",
-                    asset=_bucket_asset(name),
-                    evidence={"bucket": name},
-                    resource=name,
-                )
+        bucket_blocked = _bucket_bpa_fully_blocked(s3, name)
+        effective = bucket_blocked or account_blocked
+        if effective:
+            continue
+        findings.append(
+            build_finding(
+                "CLOUD-S3-NO-BPA",
+                description=(
+                    f"S3 bucket '{name}' is not covered by Block Public Access at "
+                    f"bucket or account level."
+                ),
+                remediation=(
+                    "Enable all four S3 Block Public Access settings on the bucket, "
+                    "or account-wide via S3 Control."
+                ),
+                asset=_bucket_asset(name),
+                evidence={
+                    "bucket": name,
+                    "bucket_bpa": bucket_blocked,
+                    "account_bpa": account_blocked,
+                    "effective_bpa": effective,
+                },
+                resource=name,
             )
+        )
     return findings
