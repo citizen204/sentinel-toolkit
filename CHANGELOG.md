@@ -13,6 +13,17 @@ All notable changes to this project are documented here. The format is based on
 - `sentinel diff <old.json> <new.json>` — new / resolved / persisting findings across scans,
   matched by stable `dedupe_key`.
 
+### Fixed
+- **S3 encryption check no longer swallows unexpected AWS errors.** `AccessDenied` and similar
+  now surface as `CLOUD-CHECK-ERROR` instead of silently reporting a clean bucket (false negative).
+- **EBS and RDS checks now paginate**, so large accounts are scanned past the first page.
+- **S3 Block Public Access considers account-level BPA**, removing false positives on accounts
+  that block centrally; evidence records bucket/account/effective posture.
+
+### Changed
+- `CLOUD-IAM-ADMIN-POLICY` is explicitly scoped to *direct* user attachment (group/role/inline
+  and wildcard customer-managed policies need effective-privilege analysis, not yet implemented).
+
 ## [0.1.0] - 2026-07-08
 
 ### Added

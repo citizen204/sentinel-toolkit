@@ -62,7 +62,11 @@ def check_password_policy(session) -> list[Finding]:
 
 
 def check_admin_users(session) -> list[Finding]:
-    """Flag IAM users with the AdministratorAccess policy attached directly."""
+    """Flag IAM users with AdministratorAccess attached *directly* to the user.
+
+    Deliberately narrow: group/role/inline and wildcard customer-managed policies
+    are not evaluated here — that requires effective-privilege analysis.
+    """
     iam = session.client("iam")
     findings: list[Finding] = []
     for user in _iter_users(iam):

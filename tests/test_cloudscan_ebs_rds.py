@@ -18,6 +18,16 @@ def test_unencrypted_ebs_volume_flagged(aws_credentials):
 
 
 @mock_aws
+def test_ebs_pagination_covers_all_volumes(aws_credentials):
+    session = boto3.Session(region_name="us-east-1")
+    ec2 = session.client("ec2")
+    for _ in range(60):
+        ec2.create_volume(AvailabilityZone="us-east-1a", Size=1, Encrypted=False)
+
+    assert len(check_unencrypted_volumes(session)) == 60
+
+
+@mock_aws
 def test_unencrypted_rds_instance_flagged(aws_credentials):
     session = boto3.Session(region_name="us-east-1")
     rds = session.client("rds")
@@ -31,3 +41,18 @@ def test_unencrypted_rds_instance_flagged(aws_credentials):
     flagged = {f.resource for f in check_unencrypted_databases(session)}
     assert "unenc-db" in flagged
     assert "enc-db" not in flagged
+
+
+@mock_aws
+def test_rds_pagination_covers_all_instances(aws_credentials):
+    session = boto3.Session(region_name="us-east-1")
+    rds = session.client("rds")
+    common = dict(
+        DBInstanceClass="db.t3.micro", Engine="postgres",
+        AllocatedStorage=20, MasterUsername="admin", MasterUserPassword="password123",
+        StorageEncrypted=False,
+    )
+    for i in range(30):
+        rds.create_db_instance(DBInstanceIdentifier=f"db-{i:03d}", **common)
+
+    assert len(check_unencrypted_databases(session)) == 30
