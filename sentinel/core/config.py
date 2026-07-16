@@ -8,9 +8,18 @@ from pydantic import BaseModel, Field
 from .suppression import Suppression
 
 
+class AwsAccount(BaseModel):
+    """A target account to audit by assuming a role into it."""
+
+    role_arn: str
+    account_id: str | None = None            # informational; STS resolves the real one
+    regions: list[str] = Field(default_factory=list)  # falls back to aws_regions
+
+
 class Config(BaseModel):
     aws_profile: str | None = None
     aws_regions: list[str] = Field(default_factory=list)
+    aws_accounts: list[AwsAccount] = Field(default_factory=list)
     target_url: str | None = None
     log_paths: list[str] = Field(default_factory=list)
     capture_file: str | None = None
