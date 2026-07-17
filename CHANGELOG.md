@@ -33,6 +33,15 @@ All notable changes to this project are documented here. The format is based on
   `asset_type`, or `provider`, with a `created_by` / `created_at` / `ticket` audit trail. A
   criteria-less suppression now matches nothing instead of hiding the whole report.
 
+- **IAM effective-privilege analysis** (`CLOUD-IAM-EFFECTIVE-ADMIN`): resolves every path that
+  reaches a user — managed and inline policies, directly or inherited via groups — and flags
+  `Action: "*"` on `Resource: "*"`, naming the path in the evidence. Supersedes
+  `CLOUD-IAM-ADMIN-POLICY`, which only saw `AdministratorAccess` attached directly. Escalation
+  chains, permission boundaries, and SCPs are documented as not-yet-evaluated.
+- **Supply-chain hardening**: the container runs as a non-root user (uid 10001) and pins its
+  base image by digest; a new workflow builds the image, asserts it isn't root, generates a
+  CycloneDX SBOM, and scans it with Trivy into the Security tab. Dependabot now tracks the
+  base image too.
 - **Automatic region discovery**: with no `aws_regions` configured, cloudscan now scans every
   region enabled for the account (`ec2:DescribeRegions`) instead of only the session default,
   so "all regions" is literally true. Pin a list to narrow the scope.

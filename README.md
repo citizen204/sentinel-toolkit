@@ -10,6 +10,7 @@ single prioritised report — with a concrete fix for every issue.
 
 [![CI](https://github.com/citizen204/sentinel-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/citizen204/sentinel-toolkit/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/citizen204/sentinel-toolkit/actions/workflows/codeql.yml/badge.svg)](https://github.com/citizen204/sentinel-toolkit/actions/workflows/codeql.yml)
+[![Supply chain](https://github.com/citizen204/sentinel-toolkit/actions/workflows/supply-chain.yml/badge.svg)](https://github.com/citizen204/sentinel-toolkit/actions/workflows/supply-chain.yml)
 ![Python](https://img.shields.io/badge/python-3.11+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Security](https://img.shields.io/badge/security-defensive-informational.svg)
@@ -58,7 +59,7 @@ sharing common plumbing:
 
 | Module | Domain | What it catches |
 |:------:|--------|-----------------|
-| ☁️ **`cloudscan`** | AWS misconfiguration | S3 (public ACL, no encryption/versioning/Block-Public-Access) · security groups open to `0.0.0.0/0` / `::/0` on SSH/RDP (all regions) · IAM (no MFA, no password policy, AdministratorAccess) · EBS/RDS unencrypted |
+| ☁️ **`cloudscan`** | AWS misconfiguration | S3 (public ACL, no encryption/versioning/Block-Public-Access) · security groups open to `0.0.0.0/0` / `::/0` on SSH/RDP (all regions) · IAM (no MFA, no password policy, **admin-equivalent privileges via user/group/inline/wildcard policies**) · EBS/RDS unencrypted |
 | 📜 **`logwatch`** | Log analysis (SIEM-lite) | SSH brute-force attempts · direct `root`/`admin` logins |
 | 🌐 **`webscan`** | Web application | Missing security headers (HSTS, CSP, X-Content-Type-Options, X-Frame-Options) |
 | 📡 **`netmon`** | Network traffic | Port scans · host sweeps — from a flow log **or a live/pcap capture via scapy** |
@@ -75,7 +76,7 @@ sharing common plumbing:
 | `CLOUD-SG-OPEN-INGRESS` | cloudscan | High |
 | `CLOUD-IAM-NO-MFA` | cloudscan | Medium |
 | `CLOUD-IAM-NO-PASSWORD-POLICY` | cloudscan | Medium |
-| `CLOUD-IAM-ADMIN-POLICY` | cloudscan | High |
+| `CLOUD-IAM-EFFECTIVE-ADMIN` | cloudscan | High |
 | `CLOUD-EBS-UNENCRYPTED` | cloudscan | Medium |
 | `CLOUD-RDS-UNENCRYPTED` | cloudscan | High |
 | `LOG-BRUTEFORCE` | logwatch | High |
@@ -104,6 +105,9 @@ Or with Docker:
 docker build -t sentinel .
 docker run --rm -v "$PWD/reports:/work/reports" sentinel scan-all
 ```
+
+The image runs as a non-root user and pins its base image by digest; every push builds it,
+generates a CycloneDX SBOM, and scans it with Trivy (results go to the Security tab).
 
 `cloudscan` needs only read-only AWS permissions — a least-privilege policy is in
 [docs/aws-iam-policy.json](docs/aws-iam-policy.json).
@@ -254,8 +258,10 @@ pytest -q          # 140+ tests, fully offline
 
 Every push and pull request runs on GitHub Actions (see the badges above): **pytest + `ruff`
 lint** for the toolkit, a **dashboard eslint + build** job, and **CodeQL** static analysis for
-Python and TypeScript. **Dependabot** keeps pip, npm, and Actions dependencies up to date. No
-test touches a real cloud account, host, or network.
+Python and TypeScript. A **supply-chain** job builds the container, asserts it doesn't run as
+root, emits a **CycloneDX SBOM**, and **Trivy**-scans the image into the Security tab.
+**Dependabot** keeps pip, npm, Actions, and the base image up to date. No test touches a real
+cloud account, host, or network.
 
 ## 🗺️ Roadmap
 

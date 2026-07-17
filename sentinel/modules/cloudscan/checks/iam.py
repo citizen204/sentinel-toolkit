@@ -8,8 +8,6 @@ from sentinel.core.rule import build_finding
 
 from .. import rules  # noqa: F401 - registers cloudscan rules
 
-_ADMIN_ARN = "arn:aws:iam::aws:policy/AdministratorAccess"
-
 
 def _iter_users(iam):
     """Yield every IAM user, paginating so large accounts are fully covered."""
@@ -77,51 +75,3 @@ def check_password_policy(session, account_id: str | None = None) -> list[Findin
                 resource="account-password-policy",
             )
         ]
-
-
-def check_admin_users(session, account_id: str | None = None) -> list[Finding]:
-    """Flag IAM users with AdministratorAccess attached *directly* to the user.
-
-    Deliberately narrow: group/role/inline and wildcard customer-managed policies
-    are not evaluated here — that requires effective-privilege analysis.
-    """
-    iam = session.client("iam")
-    findings: list[Finding] = []
-    for user in _iter_users(iam):
-        username = user["UserName"]
-        attached = iam.list_attached_user_policies(UserName=username).get(
-            "AttachedPolicies", []
-        )
-        is_admin = any(
-            p.get("PolicyArn") == _ADMIN_ARN or p.get("PolicyName") == "AdministratorAccess"
-            for p in attached
-        )
-        if is_admin:
-            findings.append(
-                build_finding(
-                    "CLOUD-IAM-ADMIN-POLICY",
-                    description=(
-                        f"IAM user '{username}' has AdministratorAccess attached directly."
-                    ),
-                    remediation=(
-                        "Remove direct AdministratorAccess; grant least-privilege via groups/roles."
-                    ),
-                    asset=Asset(
-                        provider="aws", type="iam_user", id=username,
-                        name=username, account_id=account_id,
-                    ),
-                    evidence={
-                        "user": username,
-                        "policy": _ADMIN_ARN,
-                        "attached_policies": attached,
-                    },
-                    api="iam:ListAttachedUserPolicies",
-                    rationale=(
-                        f"AdministratorAccess is attached directly to '{username}', granting "
-                        f"unrestricted actions on every resource in the account."
-                    ),
-                    verify=f"aws iam list-attached-user-policies --user-name {username}",
-                    resource=username,
-                )
-            )
-    return findings
