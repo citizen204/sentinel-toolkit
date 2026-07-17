@@ -163,10 +163,40 @@ Track posture over time by diffing two JSON reports:
 sentinel diff reports/last-week.json reports/today.json   # new / resolved / persisting
 ```
 
+## 📋 Compliance mapping
+
+Rules that correspond to a **CIS AWS Foundations Benchmark** control carry the control id, and
+`profile: cis` runs only those:
+
+```console
+$ sentinel rules
+CLOUD-IAM-EFFECTIVE-ADMIN  [High/Access Control]    ...  (CIS-AWS-1.4.0:1.16)
+CLOUD-RDS-UNENCRYPTED      [High/Data Protection]   ...  (CIS-AWS-3.0.0:2.3.1)
+CLOUD-S3-NO-BPA            [Medium/Data Exposure]   ...  (CIS-AWS-3.0.0:2.1.4)
+CLOUD-SG-OPEN-INGRESS      [High/Network Exposure]  ...  (CIS-AWS-3.0.0:5.2, CIS-AWS-3.0.0:5.3)
+```
+
+Only **4 of 16** cloud rules are mapped, and that number is deliberate. Every id is traced to
+AWS Security Hub's published CIS control table — none are recalled from memory, because a
+plausible-looking wrong control id is worse than no mapping at all. The rules that *look* like
+they should map but don't, and the benchmark controls Sentinel doesn't yet cover, are both
+listed in **[docs/compliance.md](docs/compliance.md)**. Sentinel is not a certified CIS
+assessment tool.
+
 ## 📊 Dashboard
 
 A Next.js + Tailwind UI: severity summary, per-severity filtering, a card per finding, and
 **drag-and-drop** to load any `report.json`.
+
+Drop in **several runs at once** and it becomes a posture tracker:
+
+- **Since the previous run** — new / resolved / persisting, matched on the same `dedupe_key`
+  the CLI's `sentinel diff` uses, so the UI and the CLI can't disagree.
+- **Open findings over time** — a severity-stacked bar per run (suppressed findings excluded,
+  since an accepted risk isn't open).
+- **By module / account / region** — where the risk actually concentrates.
+
+Runs are ordered by `generated_at`, so it doesn't matter what order you drop them in.
 
 ```bash
 cd dashboard
@@ -237,6 +267,8 @@ suppressions:                          # accepted risks: kept in the report, mar
 profile: baseline                      # baseline = high-confidence, high-risk rules only
                                        # strict  = also the noisier / compliance-oriented
                                        #           ones (e.g. S3 versioning)
+                                       # cis     = only rules mapped to a CIS AWS control
+                                       #           (see docs/compliance.md)
 rules:                                 # per-rule overrides
   LOG-BRUTEFORCE:
     threshold: 10                      # tune threshold-based rules
@@ -271,8 +303,10 @@ cloud account, host, or network.
 - [x] Deeper cloud checks (S3 encryption/versioning/BPA, IAM password policy + admin, EBS/RDS encryption)
 - [x] Production hygiene: CodeQL, Dependabot, Docker, SECURITY/CONTRIBUTING/CHANGELOG
 - [x] Suppressions (rule/resource/expiry/reason) and `sentinel diff` (new/resolved/persisting)
-- [ ] Trend view across scans in the dashboard
+- [x] CIS AWS Benchmark mapping (`profile: cis`) with the gaps written down, not papered over
+- [x] Posture tracker in the dashboard: run history, diff, trend, and account/region rollups
 - [ ] Markdown output format
+- [ ] IAM privilege-escalation chains, permission boundaries, SCPs
 
 ## 🤝 Contributing
 

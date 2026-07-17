@@ -19,6 +19,7 @@ export interface Finding {
   remediation: string;
   category?: string | null;
   references?: string[];
+  compliance?: string[];
   api?: string | null;
   rationale?: string | null;
   verify?: string | null;

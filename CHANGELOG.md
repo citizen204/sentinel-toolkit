@@ -51,6 +51,18 @@ All notable changes to this project are documented here. The format is based on
 - **Profile tiers now mean something**: `baseline` carries high-confidence, high-risk rules;
   `strict` adds the noisier/compliance-oriented ones (starting with S3 versioning).
 
+- **CIS AWS Benchmark mapping**: rules that correspond to a CIS control now carry its id
+  (`compliance`), findings inherit it, `sentinel rules` prints it, and `profile: cis` runs only
+  mapped rules. Every id is traced to AWS Security Hub's published control table — 4 of 16 cloud
+  rules qualified. `docs/compliance.md` records the mapping, the rules that deliberately went
+  unmapped and why, and the benchmark controls Sentinel doesn't cover; tests pin the table so it
+  can't drift.
+- **Dashboard posture tracker**: load several runs and get *since the previous run*
+  (new/resolved/persisting, matched on the same `dedupe_key` as `sentinel diff`), an open-findings
+  trend per run, and by-module/account/region rollups. Runs sort by `generated_at`, so drop order
+  doesn't matter. Suppressed findings are excluded from trend and rollups — an accepted risk isn't
+  an open one.
+
 ### Fixed
 - **`s3control` is called with an explicit region.** Account-level Block Public Access would
   raise `NoRegionError` on a session without a default region; the region is now resolved from

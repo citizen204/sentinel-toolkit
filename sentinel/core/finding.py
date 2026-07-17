@@ -41,6 +41,7 @@ class Finding(BaseModel):
     remediation: str
     category: str | None = None
     references: list[str] = Field(default_factory=list)
+    compliance: list[str] = Field(default_factory=list)  # e.g. "CIS-AWS-3.0.0:5.2"
     # --- audit trail: how this conclusion was reached ---
     api: str | None = None        # the API/source the observation came from
     rationale: str | None = None  # why the observed state is a failure

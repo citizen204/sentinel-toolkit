@@ -36,7 +36,9 @@ class Config(BaseModel):
     ignore_ids: list[str] = Field(default_factory=list)
     suppressions: list[Suppression] = Field(default_factory=list)
     # A typo here is rejected at load time rather than silently falling back.
-    profile: Literal["baseline", "strict"] = "baseline"
+    # baseline = rule defaults | strict = everything | cis = only rules with a
+    # verified compliance mapping.
+    profile: Literal["baseline", "strict", "cis"] = "baseline"
     rules: dict[str, RuleConfig] = Field(default_factory=dict)
     output_dir: str = "reports"
 
