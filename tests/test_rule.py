@@ -5,7 +5,7 @@ from sentinel.core.rule import RULES, build_finding, get_rule
 def test_catalog_registers_all_module_rules():
     import sentinel.modules  # noqa: F401 - triggers every module's rule registration
     expected = {
-        "CLOUD-S3-PUBLIC", "CLOUD-SG-OPEN-INGRESS", "CLOUD-IAM-NO-MFA", "CLOUD-CHECK-ERROR",
+        "CLOUD-S3-PUBLIC", "CLOUD-SG-OPEN-INGRESS", "CLOUD-IAM-NO-MFA", "CLOUD-IAM-EFFECTIVE-ADMIN", "CLOUD-CHECK-ERROR",
         "LOG-BRUTEFORCE", "LOG-ROOT-LOGIN", "WEB-MISSING-HEADER",
         "NET-PORT-SCAN", "NET-HOST-SWEEP",
     }

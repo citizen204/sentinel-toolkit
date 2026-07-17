@@ -84,15 +84,16 @@ IAM_NO_PASSWORD_POLICY = register_rule(Rule(
     ],
 ))
 
-IAM_ADMIN_POLICY = register_rule(Rule(
-    id="CLOUD-IAM-ADMIN-POLICY", module="cloudscan", severity=Severity.HIGH,
+IAM_EFFECTIVE_ADMIN = register_rule(Rule(
+    id="CLOUD-IAM-EFFECTIVE-ADMIN", module="cloudscan", severity=Severity.HIGH,
     category="Access Control", confidence=Confidence.HIGH,
-    title="IAM user with AdministratorAccess attached directly",
+    title="IAM user with admin-equivalent privileges",
     description=(
-        "IAM user has the AdministratorAccess managed policy attached directly to the "
-        "user. Scope: direct user attachment only — privileges granted via groups, "
-        "roles, inline policies, or wildcard customer-managed policies are not "
-        "evaluated (that needs effective-privilege analysis)."
+        "IAM user is granted Action '*' on Resource '*' through any path: a managed "
+        "policy attached to the user, an inline policy, or either of those via a group. "
+        "Supersedes the earlier direct-attachment-only check. Not yet evaluated: "
+        "privilege-escalation chains (e.g. iam:PassRole + compute), permission "
+        "boundaries, and SCPs."
     ),
     references=["https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html"],
 ))

@@ -8,7 +8,8 @@ from sentinel.core.rule import build_finding
 from sentinel.core.scanner import BaseScanner
 
 from .checks.ebs import check_unencrypted_volumes
-from .checks.iam import check_admin_users, check_password_policy, check_users_without_mfa
+from .checks.iam import check_password_policy, check_users_without_mfa
+from .checks.iam_privilege import check_effective_admin
 from .checks.rds import check_unencrypted_databases
 from .checks.s3 import (
     check_bucket_encryption,
@@ -101,7 +102,9 @@ def _scan_session(session, regions: list[str]) -> list[Finding]:
     findings += _run_check(
         "iam_password_policy", lambda: check_password_policy(session, account)
     )
-    findings += _run_check("iam_admin_users", lambda: check_admin_users(session, account))
+    findings += _run_check(
+        "iam_effective_admin", lambda: check_effective_admin(session, account)
+    )
     findings += _run_check(
         "ebs_encryption", lambda: check_unencrypted_volumes(session, regions, account)
     )
