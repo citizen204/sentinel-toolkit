@@ -29,6 +29,18 @@ def test_load_from_yaml(tmp_path):
     assert cfg.output_dir == "out"
 
 
+def test_misspelled_profile_is_rejected(tmp_path):
+    import pytest
+    from pydantic import ValidationError
+
+    cfg_file = tmp_path / "bad.yaml"
+    cfg_file.write_text("profile: strcit\n", encoding="utf-8")  # typo
+
+    # must not silently fall back to baseline
+    with pytest.raises(ValidationError):
+        load_config(cfg_file)
+
+
 def test_load_profile_and_rule_overrides(tmp_path):
     from sentinel.core.finding import Severity
 

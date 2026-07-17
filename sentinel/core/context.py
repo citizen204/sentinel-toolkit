@@ -26,6 +26,16 @@ class ScanContext(BaseModel):
     tool_version: str = __version__
 
 
+def discover_regions(session) -> list[str]:
+    """Every region enabled for this account (ec2:DescribeRegions).
+
+    DescribeRegions defaults to only the regions the account has enabled, which
+    is exactly the scan scope we want when the user hasn't pinned a list.
+    """
+    ec2 = session.client("ec2", region_name=session.region_name or "us-east-1")
+    return sorted(r["RegionName"] for r in ec2.describe_regions().get("Regions", []))
+
+
 def aws_scan_context(session, regions: list[str] | None = None) -> ScanContext:
     """Build a ScanContext from an AWS session via STS GetCallerIdentity."""
     identity = session.client("sts").get_caller_identity()

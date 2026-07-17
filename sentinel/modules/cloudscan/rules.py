@@ -50,8 +50,14 @@ S3_NO_VERSIONING = register_rule(Rule(
     id="CLOUD-S3-NO-VERSIONING", module="cloudscan", severity=Severity.LOW,
     category="Data Protection", confidence=Confidence.HIGH,
     title="S3 bucket without versioning",
-    description="S3 bucket does not have versioning enabled (no protection against overwrite/delete).",
+    description=(
+        "S3 bucket does not have versioning enabled (no protection against "
+        "overwrite/delete). Durability/compliance oriented rather than a direct "
+        "exposure, and noisy on buckets that hold disposable data — so it ships "
+        "in the 'strict' profile, not 'baseline'."
+    ),
     references=["https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html"],
+    default_enabled=False,
 ))
 
 S3_NO_BPA = register_rule(Rule(

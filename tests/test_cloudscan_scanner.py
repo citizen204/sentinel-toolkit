@@ -33,7 +33,7 @@ def test_run_aggregates_all_checks(aws_credentials):
     iam = session.client("iam")
     iam.create_user(UserName="no-mfa-user")
 
-    findings = CloudScanner().run(Config())
+    findings = CloudScanner().run(Config(aws_regions=["us-east-1"]))
 
     ids = {f.id for f in findings}
     assert {"CLOUD-S3-PUBLIC", "CLOUD-SG-OPEN-INGRESS", "CLOUD-IAM-NO-MFA"} <= ids
@@ -58,7 +58,7 @@ def test_one_failing_check_does_not_wipe_the_rest(aws_credentials, monkeypatch):
 
     monkeypatch.setattr(scanner_mod, "check_users_without_mfa", boom)
 
-    findings = scanner_mod.CloudScanner().run(Config())
+    findings = scanner_mod.CloudScanner().run(Config(aws_regions=["us-east-1"]))
 
     ids = {f.id for f in findings}
     assert "CLOUD-S3-PUBLIC" in ids       # healthy check still produced results

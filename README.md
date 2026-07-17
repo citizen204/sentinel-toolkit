@@ -209,9 +209,9 @@ Generate a starter file with `sentinel init-config`, then edit:
 ```yaml
 # sentinel.yaml
 aws_profile: my-audit-profile          # cloudscan
-aws_regions:                           # cloudscan — regions to scan
-  - us-east-1
-  - ap-southeast-2
+aws_regions:                           # cloudscan — omit/leave empty to scan every
+  - us-east-1                          #   region enabled for the account (discovered
+  - ap-southeast-2                     #   via ec2:DescribeRegions)
 aws_accounts:                          # optional: audit many accounts via AssumeRole
   - role_arn: arn:aws:iam::111111111111:role/SentinelAudit
     regions: [us-east-1, ap-southeast-2]
@@ -220,8 +220,8 @@ target_url: https://app.example.com    # webscan
 log_paths:                             # logwatch
   - /var/log/auth.log
 capture_file: capture.pcap             # netmon — a flow log OR a .pcap/.pcapng
-ignore_ids:                            # hard-drop findings by rule id
-  - CLOUD-IAM-NO-MFA
+ignore_ids:                            # DEPRECATED — prefer suppressions (audit trail).
+  - CLOUD-IAM-NO-MFA                   #   Error findings can never be ignored.
 suppressions:                          # accepted risks: kept in the report, marked suppressed
   - rule: CLOUD-IAM-NO-MFA             # narrow by dedupe_key / rule / resource /
     resource: deploy-bot               #   account_id / region / asset_type / provider
@@ -230,7 +230,9 @@ suppressions:                          # accepted risks: kept in the report, mar
     created_by: chilton                # audit trail
     ticket: SEC-123
     expires: 2027-01-01                # optional; suppression lapses after this date
-profile: baseline                      # baseline (rule defaults) | strict (everything on)
+profile: baseline                      # baseline = high-confidence, high-risk rules only
+                                       # strict  = also the noisier / compliance-oriented
+                                       #           ones (e.g. S3 versioning)
 rules:                                 # per-rule overrides
   LOG-BRUTEFORCE:
     threshold: 10                      # tune threshold-based rules
@@ -247,7 +249,7 @@ findings can be tuned away.
 ## ✅ Testing & CI
 
 ```bash
-pytest -q          # 70+ tests, fully offline
+pytest -q          # 140+ tests, fully offline
 ```
 
 Every push and pull request runs on GitHub Actions (see the badges above): **pytest + `ruff`

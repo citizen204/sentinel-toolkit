@@ -22,3 +22,10 @@ def test_filter_empty_ignore_returns_all():
 def test_filter_multiple_ignored():
     out = filter_ignored([_f("A"), _f("B"), _f("C")], ["A", "C"])
     assert [f.id for f in out] == ["B"]
+
+
+def test_error_findings_cannot_be_ignored():
+    # hiding a failed scan is worse than noise: -ERROR ids survive ignore_ids
+    findings = [_f("SCANNER-ERROR"), _f("CLOUD-CHECK-ERROR"), _f("A")]
+    out = filter_ignored(findings, ["SCANNER-ERROR", "CLOUD-CHECK-ERROR", "A"])
+    assert {f.id for f in out} == {"SCANNER-ERROR", "CLOUD-CHECK-ERROR"}

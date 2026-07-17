@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import boto3
 
-from sentinel.core.context import aws_scan_context
+from sentinel.core.context import aws_scan_context, discover_regions
 from sentinel.core.finding import Finding
 from sentinel.core.rule import build_finding
 from sentinel.core.scanner import BaseScanner
@@ -55,7 +55,17 @@ def _scan_session(session, regions: list[str]) -> list[Finding]:
     """Run every cloudscan check against one account's session."""
     findings: list[Finding] = []
 
-    # Establish identity first: it attributes every asset to an account and
+    # Resolve the scan scope. An explicit list wins; otherwise discover the
+    # account's enabled regions so an unconfigured scan really does cover
+    # every region rather than just the session default.
+    if not regions:
+        try:
+            regions = discover_regions(session)
+        except Exception as exc:  # noqa: BLE001
+            findings += _check_error("region_discovery", exc)
+            regions = [session.region_name] if session.region_name else []
+
+    # Establish identity next: it attributes every asset to an account and
     # keeps dedupe keys stable across accounts. If it fails, say so rather
     # than silently scanning without an account id.
     context = None
@@ -64,6 +74,9 @@ def _scan_session(session, regions: list[str]) -> list[Finding]:
     except Exception as exc:  # noqa: BLE001
         findings += _check_error("scan_context", exc)
     account = context.account_id if context else None
+    # s3control is regional; give it a concrete region instead of relying on
+    # the session having a default configured.
+    primary_region = regions[0] if regions else None
 
     findings += _run_check(
         "s3_public_buckets", lambda: check_public_buckets(session, account)
@@ -76,7 +89,7 @@ def _scan_session(session, regions: list[str]) -> list[Finding]:
     )
     findings += _run_check(
         "s3_block_public_access",
-        lambda: check_bucket_public_access_block(session, account),
+        lambda: check_bucket_public_access_block(session, account, primary_region),
     )
     findings += _run_check(
         "open_security_groups",

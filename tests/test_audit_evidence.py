@@ -42,7 +42,7 @@ def test_cloudscan_findings_are_auditable(aws_credentials):
     ec2.create_volume(AvailabilityZone="us-east-1a", Size=1, Encrypted=False)
     session.client("iam").create_user(UserName="no-mfa")
 
-    _assert_auditable(CloudScanner().run(Config()))
+    _assert_auditable(CloudScanner().run(Config(aws_regions=["us-east-1"])))
 
 
 def test_logwatch_findings_are_auditable(tmp_path):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -34,7 +35,8 @@ class Config(BaseModel):
     capture_file: str | None = None
     ignore_ids: list[str] = Field(default_factory=list)
     suppressions: list[Suppression] = Field(default_factory=list)
-    profile: str = "baseline"        # "baseline" (rule defaults) | "strict" (everything)
+    # A typo here is rejected at load time rather than silently falling back.
+    profile: Literal["baseline", "strict"] = "baseline"
     rules: dict[str, RuleConfig] = Field(default_factory=dict)
     output_dir: str = "reports"
 

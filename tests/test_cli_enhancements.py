@@ -61,6 +61,16 @@ def test_rules_command_lists_catalog():
     assert "NET-PORT-SCAN" in result.stdout
 
 
+def test_unknown_rule_id_in_config_is_rejected(tmp_path):
+    cfg_file = tmp_path / "bad.yaml"
+    cfg_file.write_text(
+        "rules:\n  CLOUD-S3-PUBLC:\n    enabled: false\n", encoding="utf-8"  # typo
+    )
+    result = runner.invoke(app, ["scan-all", "--config", str(cfg_file)])
+    assert result.exit_code == 1
+    assert "Unknown rule id" in result.stdout
+
+
 def test_unknown_include_exits_nonzero():
     result = runner.invoke(app, ["scan-all", "--include", "webscna"])
     assert result.exit_code == 1

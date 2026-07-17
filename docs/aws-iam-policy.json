@@ -11,6 +11,7 @@
         "s3:GetAccountPublicAccessBlock",
         "s3:GetBucketVersioning",
         "s3:GetEncryptionConfiguration",
+        "ec2:DescribeRegions",
         "ec2:DescribeSecurityGroups",
         "ec2:DescribeVolumes",
         "iam:ListUsers",
