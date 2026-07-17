@@ -17,6 +17,8 @@ SG_OPEN_INGRESS = register_rule(Rule(
     title="Security group open to the world",
     description="Security group allows unrestricted inbound (0.0.0.0/0 or ::/0) on a risky port.",
     references=["https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html"],
+    # 5.2 = IPv4 to remote server administration ports, 5.3 = IPv6. We check both.
+    compliance=["CIS-AWS-3.0.0:5.2", "CIS-AWS-3.0.0:5.3"],
 ))
 
 IAM_NO_MFA = register_rule(Rule(
@@ -70,6 +72,7 @@ S3_NO_BPA = register_rule(Rule(
     references=[
         "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html"
     ],
+    compliance=["CIS-AWS-3.0.0:2.1.4"],
 ))
 
 # --- deeper IAM posture -----------------------------------------------------
@@ -96,6 +99,9 @@ IAM_EFFECTIVE_ADMIN = register_rule(Rule(
         "boundaries, and SCPs."
     ),
     references=["https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html"],
+    # "IAM policies should not allow full '*' administrative privileges" is CIS
+    # v1.4.0 requirement 1.16; CIS removed it in v3.0.0, so it is mapped to 1.4.0.
+    compliance=["CIS-AWS-1.4.0:1.16"],
 ))
 
 # --- encryption at rest -----------------------------------------------------
@@ -116,4 +122,5 @@ RDS_UNENCRYPTED = register_rule(Rule(
     references=[
         "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
     ],
+    compliance=["CIS-AWS-3.0.0:2.3.1"],
 ))

@@ -137,7 +137,8 @@ def rules() -> None:
         return
     for rid in sorted(RULES):
         r = RULES[rid]
-        typer.echo(f"{r.id}  [{r.severity.value}/{r.category}]  {r.title}")
+        mapped = f"  ({', '.join(r.compliance)})" if r.compliance else ""
+        typer.echo(f"{r.id}  [{r.severity.value}/{r.category}]  {r.title}{mapped}")
 
 
 def _tokens(value: str | None) -> set[str]:

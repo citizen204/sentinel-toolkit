@@ -12,43 +12,51 @@ function isReport(data: unknown): data is Report {
   );
 }
 
-export default function UploadReport({
-  onLoad,
-}: {
-  onLoad: (report: Report) => void;
-}) {
-  const [dragging, setDragging] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  function handleFile(file: File) {
+function readReport(file: File): Promise<Report> {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
+    reader.onerror = () => reject(new Error(`could not read ${file.name}`));
     reader.onload = () => {
       try {
         const data = JSON.parse(String(reader.result));
         if (!isReport(data)) {
-          throw new Error("not a Sentinel report (missing summary/findings)");
+          throw new Error(`${file.name} is not a Sentinel report`);
         }
-        setError(null);
-        onLoad(data);
+        resolve(data);
       } catch (e) {
-        setError(
-          `Could not load report: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        reject(e instanceof Error ? e : new Error(String(e)));
       }
     };
     reader.readAsText(file);
+  });
+}
+
+export default function UploadReport({
+  onLoad,
+}: {
+  onLoad: (reports: Report[]) => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFiles(files: FileList) {
+    try {
+      const reports = await Promise.all([...files].map(readReport));
+      setError(null);
+      onLoad(reports);
+    } catch (e) {
+      setError(`Could not load report: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   function onInput(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
+    if (e.target.files?.length) handleFiles(e.target.files);
   }
 
   function onDrop(e: DragEvent<HTMLDivElement>) {
     e.preventDefault();
     setDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    if (file) handleFile(file);
+    if (e.dataTransfer.files?.length) handleFiles(e.dataTransfer.files);
   }
 
   return (
@@ -64,15 +72,19 @@ export default function UploadReport({
       }`}
     >
       <label className="cursor-pointer font-medium text-slate-700">
-        <span className="underline">Choose a report.json</span>
+        <span className="underline">Choose report.json file(s)</span>
         <input
           type="file"
+          multiple
           accept="application/json,.json"
           onChange={onInput}
           className="hidden"
         />
       </label>
-      <span className="text-slate-500"> or drag &amp; drop one here.</span>
+      <span className="text-slate-500">
+        {" "}
+        or drag &amp; drop them here — add several runs to see trend and diff.
+      </span>
       {error && <p className="mt-2 text-red-600">{error}</p>}
     </div>
   );

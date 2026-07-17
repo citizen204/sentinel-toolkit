@@ -57,8 +57,14 @@ def rule_enabled(rule_id: str, config) -> bool:
     rule = RULES.get(rule_id)
     if rule is None:
         return True
-    if getattr(config, "profile", "baseline") == "strict":
+
+    profile = getattr(config, "profile", "baseline")
+    if profile == "strict":
         return True
+    if profile == "cis":
+        # Only rules carrying a verified control mapping — an audit against a
+        # benchmark shouldn't include rules that aren't part of it.
+        return bool(rule.compliance)
     return rule.default_enabled
 
 
@@ -109,6 +115,7 @@ def build_finding(
         remediation=remediation,
         category=rule.category,
         references=rule.references,
+        compliance=rule.compliance,
         confidence=rule.confidence,
         asset=asset,
         resource=resource,

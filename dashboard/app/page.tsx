@@ -2,9 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Report, Severity } from "@/lib/types";
+import { diffReports, sortRuns } from "@/lib/diff";
 import SummaryBar from "@/components/SummaryBar";
 import FindingCard from "@/components/FindingCard";
 import UploadReport from "@/components/UploadReport";
+import TrendChart from "@/components/TrendChart";
+import DiffPanel from "@/components/DiffPanel";
+import AggregationPanel from "@/components/AggregationPanel";
 
 const FILTERS: (Severity | "All")[] = [
   "All",
@@ -16,7 +20,7 @@ const FILTERS: (Severity | "All")[] = [
 ];
 
 export default function Home() {
-  const [report, setReport] = useState<Report | null>(null);
+  const [runs, setRuns] = useState<Report[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Severity | "All">("All");
 
@@ -26,30 +30,38 @@ export default function Home() {
         if (!r.ok) throw new Error(`Failed to load report.json (${r.status})`);
         return r.json();
       })
-      .then((data: Report) => setReport(data))
+      .then((data: Report) => setRuns([data]))
       .catch((e) => setError(String(e)));
   }, []);
 
+  const current = runs.length ? runs[runs.length - 1] : null;
+  const previous = runs.length > 1 ? runs[runs.length - 2] : null;
+  const diff = useMemo(
+    () => (previous && current ? diffReports(previous, current) : null),
+    [previous, current],
+  );
+
   const findings = useMemo(() => {
-    if (!report) return [];
+    if (!current) return [];
     return filter === "All"
-      ? report.findings
-      : report.findings.filter((f) => f.severity === filter);
-  }, [report, filter]);
+      ? current.findings
+      : current.findings.filter((f) => f.severity === filter);
+  }, [current, filter]);
 
   return (
     <main className="mx-auto max-w-4xl p-8">
       <h1 className="text-2xl font-bold">Sentinel Security Dashboard</h1>
-      {report && (
+      {current && (
         <p className="mt-1 text-sm text-slate-500">
-          Generated at {report.generated_at} · {report.findings.length} findings
+          Generated at {current.generated_at} · {current.findings.length} findings
+          {runs.length > 1 ? ` · ${runs.length} runs loaded` : ""}
         </p>
       )}
 
       <div className="mt-6">
         <UploadReport
-          onLoad={(r) => {
-            setReport(r);
+          onLoad={(loaded) => {
+            setRuns((prev) => sortRuns([...prev, ...loaded]));
             setError(null);
           }}
         />
@@ -57,15 +69,31 @@ export default function Home() {
 
       {error && <p className="mt-6 text-red-600">{error}</p>}
 
-      {report && (
+      {current && (
         <>
           <div className="mt-6">
-            <SummaryBar summary={report.summary} />
-            {report.suppressed ? (
+            <SummaryBar summary={current.summary} />
+            {current.suppressed ? (
               <p className="mt-2 text-sm text-slate-500">
-                {report.suppressed} finding(s) suppressed
+                {current.suppressed} finding(s) suppressed
               </p>
             ) : null}
+          </div>
+
+          {diff && (
+            <div className="mt-6">
+              <DiffPanel diff={diff} />
+            </div>
+          )}
+
+          {runs.length > 1 && (
+            <div className="mt-6">
+              <TrendChart runs={runs} />
+            </div>
+          )}
+
+          <div className="mt-6">
+            <AggregationPanel findings={current.findings} />
           </div>
 
           <div className="mt-6 flex flex-wrap gap-2">
@@ -95,7 +123,7 @@ export default function Home() {
         </>
       )}
 
-      {!report && !error && (
+      {!current && !error && (
         <p className="mt-6 text-slate-500">Loading report…</p>
       )}
     </main>

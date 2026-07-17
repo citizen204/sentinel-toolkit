@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-28T12:00:00+00:00",
+  "generated_at": "2026-06-21T12:00:00+00:00",
   "summary": {
     "Critical": 1,
     "High": 3,
@@ -123,40 +123,42 @@
       "dedupe_key": "8077c029998948038a5c224b8ba1b60f829184ff4d250a5cf86d388736fdcdef"
     },
     {
-      "id": "NET-PORT-SCAN",
-      "module": "netmon",
+      "id": "CLOUD-RDS-UNENCRYPTED",
+      "module": "cloudscan",
       "severity": "High",
-      "title": "Possible port scan",
-      "description": "198.51.100.23 connected to 27 distinct ports.",
-      "remediation": "Investigate the source host; block it if unauthorized.",
-      "category": "Reconnaissance",
+      "title": "Unencrypted RDS instance",
+      "description": "RDS instance 'legacy-db' does not have storage encryption enabled.",
+      "remediation": "Enable storage encryption (restore/recreate the instance encrypted).",
+      "category": "Data Protection",
       "references": [
-        "https://attack.mitre.org/techniques/T1046/"
+        "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html"
       ],
-      "compliance": [],
-      "api": "network flow log",
-      "rationale": "198.51.100.23 touched 27 distinct destination ports, at or above the threshold of 10. Fanning out across many ports on a host is characteristic of service discovery, not normal traffic.",
-      "verify": "Review the flow log / capture for connections from 198.51.100.23.",
+      "compliance": [
+        "CIS-AWS-3.0.0:2.3.1"
+      ],
+      "api": "rds:DescribeDBInstances",
+      "rationale": "DescribeDBInstances reports StorageEncrypted=false, so the database storage, snapshots, and backups are unencrypted at rest.",
+      "verify": "aws rds describe-db-instances --db-instance-identifier legacy-db --region us-east-1",
       "confidence": "Medium",
       "status": "open",
       "suppression_reason": null,
       "asset": {
-        "provider": "network",
-        "type": "ip",
-        "id": "198.51.100.23",
+        "provider": "aws",
+        "type": "rds_instance",
+        "id": "legacy-db",
         "name": null,
-        "account_id": null,
-        "region": null,
+        "account_id": "123456789012",
+        "region": "us-east-1",
         "tags": {}
       },
       "evidence": {
-        "src_ip": "198.51.100.23",
-        "distinct_ports": 27,
-        "threshold": 10
+        "db_instance": "legacy-db",
+        "region": "us-east-1",
+        "storage_encrypted": false
       },
-      "resource": "198.51.100.23",
+      "resource": "legacy-db",
       "timestamp": "2026-07-17T11:29:08.492147Z",
-      "dedupe_key": "06abc1dcef3f12b535a19c502c91413e497784325e5fb1cf320b1a0992d77779"
+      "dedupe_key": "dcc0fd37c31a411fc58962911d14039eafa86e3eee5a71d4464d93dd3b8c1bd8"
     },
     {
       "id": "CLOUD-IAM-NO-MFA",
