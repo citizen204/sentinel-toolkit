@@ -1,0 +1,53 @@
+name: Supply chain
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 4 * * 1"
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t sentinel:ci .
+
+      - name: Confirm the image does not run as root
+        run: |
+          uid=$(docker run --rm --entrypoint id sentinel:ci -u)
+          echo "container uid: $uid"
+          test "$uid" != "0"
+
+      - name: Generate SBOM (CycloneDX)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD":/out anchore/syft:latest \
+            sentinel:ci -o cyclonedx-json=/out/sbom.cdx.json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentinel-sbom
+          path: sbom.cdx.json
+
+      # Report base-image CVEs into the Security tab rather than failing the
+      # build on upstream issues we can't fix in this repo.
+      - name: Scan image (Trivy)
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD":/out aquasecurity/trivy:latest image \
+            --format sarif --output /out/trivy.sarif \
+            --severity CRITICAL,HIGH --exit-code 0 sentinel:ci
+
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-image
