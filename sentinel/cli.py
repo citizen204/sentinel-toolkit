@@ -48,12 +48,23 @@ def run_scanners(scanners, config) -> list[Finding]:
     return findings
 
 
+def _is_error_finding(rule_id: str) -> bool:
+    """Error findings (scanner/check failures) end in -ERROR and are protected."""
+    return rule_id.endswith("-ERROR")
+
+
 def filter_ignored(findings, ignore_ids) -> list[Finding]:
-    """Drop findings whose rule id is listed in ignore_ids (accepted risks)."""
+    """Drop findings whose rule id is listed in ignore_ids.
+
+    DEPRECATED in favour of `suppressions`, which keep an audit trail. Error
+    findings can never be ignored — hiding a failed scan is worse than noise.
+    """
     if not ignore_ids:
         return findings
     ignore = set(ignore_ids)
-    return [f for f in findings if f.id not in ignore]
+    return [
+        f for f in findings if f.id not in ignore or _is_error_finding(f.id)
+    ]
 
 app = typer.Typer(
     help="Sentinel — a modular defensive security toolkit (authorized use only).",
@@ -73,6 +84,37 @@ def _emit_reports(findings, output_dir: str, fmt) -> None:
     total = len(findings)
     note = f" ({suppressed} suppressed)" if suppressed else ""
     typer.echo(f"Scan complete: {total} finding(s){note}.")
+
+
+def unknown_rule_ids(cfg) -> list[str]:
+    """Rule ids referenced by config that don't exist in the catalog."""
+    from sentinel.core.rule import RULES
+
+    referenced = set(cfg.rules) | set(cfg.ignore_ids)
+    referenced |= {s.rule for s in cfg.suppressions if s.rule}
+    return sorted(referenced - set(RULES))
+
+
+def _load_validated_config(path):
+    """Load config and reject references to rules that don't exist.
+
+    A typo'd rule id would otherwise mean the override, ignore, or suppression
+    silently never applies — the scan looks configured but isn't.
+    """
+    cfg = load_config(path)
+    unknown = unknown_rule_ids(cfg)
+    if unknown:
+        typer.echo(
+            f"Unknown rule id(s) in config: {', '.join(unknown)}. "
+            f"Run 'sentinel rules' to see the catalog."
+        )
+        raise typer.Exit(code=1)
+    for rule_id in cfg.ignore_ids:
+        if _is_error_finding(rule_id):
+            typer.echo(
+                f"Warning: '{rule_id}' cannot be ignored — scan failures are always reported."
+            )
+    return cfg
 
 
 @app.command("list-scanners")
@@ -142,7 +184,7 @@ def scan_all(
     A failure in one scanner does not stop the others (see run_scanners).
     Use --include/--exclude to narrow which scanners run.
     """
-    cfg = load_config(config)
+    cfg = _load_validated_config(config)
     try:
         selected = _select_scanners(include, exclude)
     except ValueError as exc:
@@ -172,7 +214,7 @@ def scan(
         available = ", ".join(sorted(scanners)) or "none"
         typer.echo(f"Unknown scanner '{name}'. Available: {available}")
         raise typer.Exit(code=1)
-    cfg = load_config(config)
+    cfg = _load_validated_config(config)
     findings = scanners[name]().run(cfg)
     findings = apply_rule_config(findings, cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
@@ -183,8 +225,9 @@ def scan(
 _SAMPLE_CONFIG = """\
 # Sentinel configuration — point each scanner at real targets.
 aws_profile: my-audit-profile          # cloudscan: AWS profile to audit
-aws_regions:                           # cloudscan: regions to scan (empty = default region)
-  - us-east-1
+aws_regions: []                        # cloudscan: empty = scan every region enabled for
+                                       # the account (ec2:DescribeRegions). Pin a list to
+                                       # narrow the scope, e.g. [us-east-1, ap-southeast-2]
 # Audit many accounts by assuming a role in each (omit to audit the current creds).
 # Your principal needs sts:AssumeRole on each role; each role carries the read-only
 # audit policy from docs/aws-iam-policy.json.
@@ -196,7 +239,8 @@ target_url: https://app.example.com    # webscan: URL to check
 log_paths:                             # logwatch: auth logs to analyse
   - /var/log/auth.log
 capture_file: capture.pcap             # netmon: a flow log or a .pcap/.pcapng
-ignore_ids: []                         # hard-drop findings by rule id
+ignore_ids: []                         # DEPRECATED — prefer suppressions below.
+                                       # Error findings can never be ignored.
 suppressions:                          # accepted risks: kept in the report, marked suppressed
   # narrow by any of: dedupe_key / rule / resource / account_id / region /
   # asset_type / provider. At least one is required (a criteria-less
@@ -208,7 +252,8 @@ suppressions:                          # accepted risks: kept in the report, mar
     created_by: chilton
     ticket: SEC-123
     expires: 2027-01-01                # optional; suppression lapses after this date
-profile: baseline                      # baseline (rule defaults) | strict (everything on)
+profile: baseline                      # baseline = high-confidence, high-risk rules only;
+                                       # strict = also noisier/compliance-oriented rules
 rules:                                 # per-rule overrides
   LOG-BRUTEFORCE:
     threshold: 10                      # tune threshold-based rules to your environment

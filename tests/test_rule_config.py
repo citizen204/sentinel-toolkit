@@ -51,6 +51,16 @@ def test_explicit_enable_beats_profile():
     assert len(apply_rule_config([_f("TEST-OFF-2", Severity.LOW)], cfg)) == 1
 
 
+def test_baseline_and_strict_differ_on_a_real_rule():
+    import sentinel.modules  # noqa: F401
+    versioning = _f("CLOUD-S3-NO-VERSIONING", Severity.LOW)
+
+    assert apply_rule_config([versioning], Config()) == []  # baseline: off
+    assert len(
+        apply_rule_config([_f("CLOUD-S3-NO-VERSIONING", Severity.LOW)], Config(profile="strict"))
+    ) == 1
+
+
 def test_threshold_for():
     cfg = Config(rules={"LOG-BRUTEFORCE": RuleConfig(threshold=20)})
     assert cfg.threshold_for("LOG-BRUTEFORCE", 5) == 20

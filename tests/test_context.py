@@ -1,7 +1,7 @@
 import boto3
 from moto import mock_aws
 
-from sentinel.core.context import ScanContext, aws_scan_context
+from sentinel.core.context import ScanContext, aws_scan_context, discover_regions
 
 
 @mock_aws
@@ -15,3 +15,13 @@ def test_scan_context_from_sts(aws_credentials):
     assert ctx.regions == ["us-east-1", "us-west-2"]
     assert ctx.tool_version
     assert ctx.started_at is not None
+
+
+@mock_aws
+def test_discover_regions_returns_enabled_regions(aws_credentials):
+    session = boto3.Session(region_name="us-east-1")
+    regions = discover_regions(session)
+
+    assert "us-east-1" in regions
+    assert len(regions) > 1          # a real scan scope, not just the default
+    assert regions == sorted(regions)

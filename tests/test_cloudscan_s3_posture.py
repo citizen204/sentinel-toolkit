@@ -70,6 +70,19 @@ def test_block_public_access_flagged_when_absent(aws_credentials):
 
 
 @mock_aws
+def test_account_bpa_uses_the_region_it_is_given(aws_credentials):
+    # s3control is regional: the region must be explicit, not left to the
+    # session default (which may not exist -> NoRegionError on a real account).
+    session = boto3.Session(region_name="us-east-1")
+    session.client("s3").create_bucket(Bucket="region-test-bucket")
+
+    findings = check_bucket_public_access_block(session, region="ap-southeast-2")
+
+    finding = next(f for f in findings if f.resource == "region-test-bucket")
+    assert finding.evidence["account_bpa_region"] == "ap-southeast-2"
+
+
+@mock_aws
 def test_account_level_bpa_prevents_false_positive(aws_credentials):
     session = boto3.Session(region_name="us-east-1")
     session.client("s3").create_bucket(Bucket="no-bucket-bpa")

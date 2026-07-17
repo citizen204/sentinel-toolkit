@@ -33,7 +33,21 @@ All notable changes to this project are documented here. The format is based on
   `asset_type`, or `provider`, with a `created_by` / `created_at` / `ticket` audit trail. A
   criteria-less suppression now matches nothing instead of hiding the whole report.
 
+- **Automatic region discovery**: with no `aws_regions` configured, cloudscan now scans every
+  region enabled for the account (`ec2:DescribeRegions`) instead of only the session default,
+  so "all regions" is literally true. Pin a list to narrow the scope.
+- **Config that doesn't apply is now an error**: `profile` is a validated enum (a typo is
+  rejected instead of silently falling back to baseline), and unknown rule ids in `rules`,
+  `ignore_ids`, or `suppressions` abort the run with a clear message.
+- **Profile tiers now mean something**: `baseline` carries high-confidence, high-risk rules;
+  `strict` adds the noisier/compliance-oriented ones (starting with S3 versioning).
+
 ### Fixed
+- **`s3control` is called with an explicit region.** Account-level Block Public Access would
+  raise `NoRegionError` on a session without a default region; the region is now resolved from
+  the scan scope and recorded in the finding's evidence.
+- **`ignore_ids` can no longer hide scan failures.** Any `*-ERROR` finding survives ignore rules,
+  and `ignore_ids` is deprecated in favour of `suppressions` (which carry reason/ticket/expiry).
 - **S3 encryption check no longer swallows unexpected AWS errors.** `AccessDenied` and similar
   now surface as `CLOUD-CHECK-ERROR` instead of silently reporting a clean bucket (false negative).
 - **EBS and RDS checks now paginate**, so large accounts are scanned past the first page.

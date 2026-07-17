@@ -133,18 +133,24 @@ def check_bucket_versioning(session, account_id: str | None = None) -> list[Find
     return findings
 
 
-def _account_bpa_fully_blocked(session) -> bool:
-    """Whether account-level S3 Block Public Access blocks all four vectors."""
+def _account_bpa_fully_blocked(session, region: str | None = None) -> tuple[bool, str]:
+    """Whether account-level S3 BPA blocks all four vectors, and the region used.
+
+    s3control is a regional endpoint: without an explicit region a session that
+    has no default configured raises NoRegionError, so the region is resolved
+    here rather than left to chance.
+    """
     account_id = session.client("sts").get_caller_identity()["Account"]
+    client_region = region or session.region_name or "us-east-1"
     try:
-        cfg = session.client("s3control").get_public_access_block(AccountId=account_id)[
-            "PublicAccessBlockConfiguration"
-        ]
+        cfg = session.client(
+            "s3control", region_name=client_region
+        ).get_public_access_block(AccountId=account_id)["PublicAccessBlockConfiguration"]
     except ClientError as exc:
         if exc.response["Error"]["Code"] != "NoSuchPublicAccessBlockConfiguration":
             raise
-        return False
-    return all(cfg.get(k) for k in _BPA_KEYS)
+        return False, client_region
+    return all(cfg.get(k) for k in _BPA_KEYS), client_region
 
 
 def _bucket_bpa_fully_blocked(s3, name: str) -> bool:
@@ -158,7 +164,7 @@ def _bucket_bpa_fully_blocked(s3, name: str) -> bool:
 
 
 def check_bucket_public_access_block(
-    session, account_id: str | None = None
+    session, account_id: str | None = None, region: str | None = None
 ) -> list[Finding]:
     """Flag buckets not covered by Block Public Access at bucket *or* account level.
 
@@ -166,7 +172,7 @@ def check_bucket_public_access_block(
     setting would report false positives on accounts that block centrally.
     """
     s3 = session.client("s3")
-    account_blocked = _account_bpa_fully_blocked(session)
+    account_blocked, bpa_region = _account_bpa_fully_blocked(session, region)
     findings: list[Finding] = []
     for name in _bucket_names(s3):
         bucket_blocked = _bucket_bpa_fully_blocked(s3, name)
@@ -191,6 +197,7 @@ def check_bucket_public_access_block(
                     "account_bpa": account_blocked,
                     "effective_bpa": effective,
                     "required_settings": list(_BPA_KEYS),
+                    "account_bpa_region": bpa_region,
                 },
                 api="s3:GetPublicAccessBlock + s3:GetAccountPublicAccessBlock",
                 rationale=(

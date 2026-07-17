@@ -17,7 +17,7 @@ def test_assume_role_scans_target_account(aws_credentials):
     _public_bucket(boto3.Session(region_name="us-east-1"))
 
     cfg = Config(
-        aws_accounts=[AwsAccount(role_arn="arn:aws:iam::123456789012:role/audit")]
+        aws_accounts=[AwsAccount(role_arn="arn:aws:iam::123456789012:role/audit", regions=["us-east-1"])]
     )
     findings = CloudScanner().run(cfg)
 
@@ -43,7 +43,7 @@ def test_failed_assume_role_is_isolated(aws_credentials, monkeypatch):
     cfg = Config(
         aws_accounts=[
             AwsAccount(role_arn="arn:aws:iam::111111111111:role/bad"),
-            AwsAccount(role_arn="arn:aws:iam::123456789012:role/audit"),
+            AwsAccount(role_arn="arn:aws:iam::123456789012:role/audit", regions=["us-east-1"]),
         ]
     )
     findings = scanner_mod.CloudScanner().run(cfg)
