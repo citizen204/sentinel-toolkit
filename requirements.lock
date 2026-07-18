@@ -7,11 +7,6 @@
 # Regenerate: pip install . into a clean venv, then
 #   pip freeze --exclude-editable | grep -iv '^sentinel' > requirements.lock
 # Dev/test extras are deliberately excluded - they never reach the image.
-#
-# A few entries are not our dependencies at all: they ship preinstalled in the
-# python:3.11-slim base image and therefore exist in the built image. They are
-# pinned here so that a base-image update changing them fails the build loudly
-# instead of silently altering what we ship. Marked [base] below.
 annotated-doc==0.0.4
 annotated-types==0.7.0
 boto3==1.43.51
@@ -25,7 +20,6 @@ jmespath==1.1.0
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
-packaging==26.2  # [base] preinstalled in python:3.11-slim
 pydantic==2.13.4
 pydantic_core==2.46.4
 Pygments==2.20.0
