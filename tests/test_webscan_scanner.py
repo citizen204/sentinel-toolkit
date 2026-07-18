@@ -1,7 +1,8 @@
+import pytest
 import responses
 
 from sentinel.core.config import Config
-from sentinel.core.scanner import all_scanners
+from sentinel.core.scanner import ScannerSkipped, all_scanners
 
 URL = "https://example.test/"
 
@@ -20,6 +21,9 @@ def test_run_uses_target_url():
     assert all(f.id == "WEB-MISSING-HEADER" for f in findings)
 
 
-def test_run_no_target_returns_empty():
+def test_run_without_target_is_skipped_not_clean():
+    """An unconfigured scanner returning [] reads as a clean bill of health."""
     from sentinel.modules.webscan.scanner import WebScanner
-    assert WebScanner().run(Config()) == []
+
+    with pytest.raises(ScannerSkipped):
+        WebScanner().run(Config())

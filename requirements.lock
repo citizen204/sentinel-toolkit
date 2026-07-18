@@ -1,0 +1,36 @@
+# Runtime dependency lock for the container image.
+#
+# Applied by the Dockerfile as pip constraints, so the image ships the exact
+# transitive versions that were tested rather than whatever resolves on build
+# day. The supply-chain workflow re-checks the built image against this file.
+#
+# Regenerate: pip install . into a clean venv, then
+#   pip freeze --exclude-editable | grep -iv '^sentinel' > requirements.lock
+# Dev/test extras are deliberately excluded - they never reach the image.
+annotated-doc==0.0.4
+annotated-types==0.7.0
+boto3==1.43.51
+botocore==1.43.51
+certifi==2026.6.17
+charset-normalizer==3.4.9
+colorama==0.4.6
+idna==3.18
+Jinja2==3.1.6
+jmespath==1.1.0
+markdown-it-py==4.2.0
+MarkupSafe==3.0.3
+mdurl==0.1.2
+pydantic==2.13.4
+pydantic_core==2.46.4
+Pygments==2.20.0
+python-dateutil==2.9.0.post0
+PyYAML==6.0.3
+requests==2.34.2
+rich==15.0.0
+s3transfer==0.19.1
+shellingham==1.5.4
+six==1.17.0
+typer==0.27.0
+typing-inspection==0.4.2
+typing_extensions==4.16.0
+urllib3==2.7.0

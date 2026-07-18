@@ -7,14 +7,21 @@ on:
   schedule:
     - cron: "0 4 * * 1"
 
+# Every third-party action is pinned to a full commit SHA and every tool image to
+# a digest. A tag like @v4 or :latest can be repointed at new code by whoever
+# controls it; only an immutable reference makes "what ran" reproducible.
+# https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions
 jobs:
   image:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
+    env:
+      SYFT: anchore/syft@sha256:b4f1df79f97b817682d8b5ff941eb6bfe74f6172553a5e312c75bbc2eabc405c
+      TRIVY: ghcr.io/aquasecurity/trivy@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Build image
         run: docker build -t sentinel:ci .
@@ -25,29 +32,73 @@ jobs:
           echo "container uid: $uid"
           test "$uid" != "0"
 
+      # Checks versions rather than exact set equality: a constraints file may
+      # legitimately list a package that a given platform doesn't install, but a
+      # version that disagrees with the lock means the image is not what we tested.
+      - name: Confirm the image matches the lock file
+        run: |
+          docker run --rm --entrypoint pip sentinel:ci freeze --exclude-editable \
+            | grep -iv '^sentinel' > installed.txt
+          python - <<'PY'
+          def read(path):
+              out = {}
+              for line in open(path, encoding="utf-8"):
+                  if "==" in line:
+                      name, version = line.strip().split("==")
+                      out[name.lower().replace("_", "-")] = version
+              return out
+
+          locked, installed = read("requirements.lock"), read("installed.txt")
+          drift = {
+              name: (locked[name], version)
+              for name, version in installed.items()
+              if name in locked and locked[name] != version
+          }
+          unlocked = sorted(set(installed) - set(locked))
+          for name, (want, got) in sorted(drift.items()):
+              print(f"drift: {name} locked at {want}, image has {got}")
+          for name in unlocked:
+              print(f"unlocked: {name}=={installed[name]} is not in requirements.lock")
+          if drift or unlocked:
+              raise SystemExit("image does not match requirements.lock")
+          print(f"{len(installed)} packages match the lock")
+          PY
+
       - name: Generate SBOM (CycloneDX)
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$PWD":/out anchore/syft:latest \
+            -v "$PWD":/out "$SYFT" \
             sentinel:ci -o cyclonedx-json=/out/sbom.cdx.json
 
       - name: Upload SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: sentinel-sbom
           path: sbom.cdx.json
 
-      # Report base-image CVEs into the Security tab rather than failing the
-      # build on upstream issues we can't fix in this repo.
-      - name: Scan image (Trivy)
+      # Gate: vulnerabilities in OUR dependencies, where a fix exists. These are
+      # actionable in this repo, so they block the merge.
+      - name: Fail on fixable vulnerabilities in application dependencies
         run: |
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$PWD":/out ghcr.io/aquasecurity/trivy:latest image \
+            "$TRIVY" image \
+            --pkg-types library --ignore-unfixed \
+            --severity CRITICAL,HIGH --exit-code 1 sentinel:ci
+
+      # Report-only: base-image CVEs, including ones with no upstream fix. Failing
+      # on these would mean a red build we cannot turn green, which trains people
+      # to ignore the signal -- so they go to the Security tab instead.
+      - name: Scan whole image (Trivy, report only)
+        if: always()
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD":/out "$TRIVY" image \
             --format sarif --output /out/trivy.sarif \
             --severity CRITICAL,HIGH --exit-code 0 sentinel:ci
 
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        uses: github/codeql-action/upload-sarif@b7351df727350dca84cb9d725d57dcf5bc82ba26 # v3
         with:
           sarif_file: trivy.sarif
           category: trivy-image

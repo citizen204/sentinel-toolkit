@@ -15,6 +15,7 @@
         "ec2:DescribeSecurityGroups",
         "ec2:DescribeVolumes",
         "iam:ListUsers",
+        "iam:ListPolicies",
         "iam:ListMFADevices",
         "iam:GetAccountPasswordPolicy",
         "iam:ListAttachedUserPolicies",

@@ -1,5 +1,34 @@
 {
+  "schema_version": "1.0",
+  "run_id": "375b88f8-4473-4356-9a77-eb3b92e6bb5c",
+  "tool_version": "0.1.0",
   "generated_at": "2026-06-28T12:00:00+00:00",
+  "ruleset_digest": "4f53cda18c2baa0c",
+  "config_digest": "e76796a6cab15968",
+  "coverage": {
+    "scanners": {
+      "cloudscan": "ok",
+      "logwatch": "ok",
+      "webscan": "ok",
+      "netmon": "ok"
+    },
+    "accounts": [
+      "123456789012"
+    ],
+    "regions": [
+      "us-east-1"
+    ],
+    "rules": [
+      "CLOUD-IAM-NO-MFA",
+      "CLOUD-RDS-UNENCRYPTED",
+      "CLOUD-S3-PUBLIC",
+      "CLOUD-SG-OPEN-INGRESS",
+      "LOG-BRUTEFORCE",
+      "LOG-ROOT-LOGIN",
+      "NET-PORT-SCAN",
+      "WEB-MISSING-HEADER"
+    ]
+  },
   "summary": {
     "Critical": 1,
     "High": 3,
@@ -42,7 +71,7 @@
         "threshold": 5
       },
       "resource": "203.0.113.10",
-      "timestamp": "2026-07-17T11:29:08.492147Z",
+      "timestamp": "2026-07-18T13:54:23.440193Z",
       "dedupe_key": "4f74b380514758aaf7fcb9a1a8881e5e046ba9c7e9e95cecf5982b42fd36151d"
     },
     {
@@ -79,7 +108,7 @@
         ]
       },
       "resource": "prod-backups",
-      "timestamp": "2026-07-17T11:29:08.492147Z",
+      "timestamp": "2026-07-18T13:54:23.440193Z",
       "dedupe_key": "6747b765c711fa6d0b3d131c8ccbe30e94f736c959eff21ca923cc52b5a0fae2"
     },
     {
@@ -119,7 +148,7 @@
         "region": "us-east-1"
       },
       "resource": "sg-0a1b2c",
-      "timestamp": "2026-07-17T11:29:08.492147Z",
+      "timestamp": "2026-07-18T13:54:23.440193Z",
       "dedupe_key": "8077c029998948038a5c224b8ba1b60f829184ff4d250a5cf86d388736fdcdef"
     },
     {
@@ -155,7 +184,7 @@
         "threshold": 10
       },
       "resource": "198.51.100.23",
-      "timestamp": "2026-07-17T11:29:08.492147Z",
+      "timestamp": "2026-07-18T13:54:23.440193Z",
       "dedupe_key": "06abc1dcef3f12b535a19c502c91413e497784325e5fb1cf320b1a0992d77779"
     },
     {
@@ -190,7 +219,7 @@
         "mfa_devices": []
       },
       "resource": "deploy-bot",
-      "timestamp": "2026-07-17T11:29:08.492147Z",
+      "timestamp": "2026-07-18T13:54:23.440193Z",
       "dedupe_key": "24650a7f22e5ab057fbcbb01cb2c07dc6434cd1a221761ca58eaa4ab40ee6aa5"
     },
     {
@@ -225,7 +254,7 @@
         "ip": "203.0.113.7"
       },
       "resource": "203.0.113.7",
-      "timestamp": "2026-07-17T11:29:08.492147Z",
+      "timestamp": "2026-07-18T13:54:23.440193Z",
       "dedupe_key": "a84b26a2b28cfa3a9e58a5392a9fa8d67c2ee0d71701b3e83f70e997f96bac05"
     },
     {
@@ -261,7 +290,7 @@
         "status_code": 200
       },
       "resource": "https://app.example.com",
-      "timestamp": "2026-07-17T11:29:08.492147Z",
+      "timestamp": "2026-07-18T13:54:23.440193Z",
       "dedupe_key": "335358a9a9351d8424e58f6dd7061953eb211396473dc554964e1fd34fc7b72e"
     },
     {
@@ -297,7 +326,7 @@
         "status_code": 200
       },
       "resource": "https://app.example.com",
-      "timestamp": "2026-07-17T11:29:08.492147Z",
+      "timestamp": "2026-07-18T13:54:23.440193Z",
       "dedupe_key": "341fc39d3547393c95dbf3fa9762032fb35791efafa87fb8035742d6c77400b1"
     }
   ]

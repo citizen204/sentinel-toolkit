@@ -7,3 +7,7 @@ venv/
 reports/
 node_modules/
 .DS_Store
+
+# setuptools build artifacts
+build/
+dist/

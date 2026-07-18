@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from .finding import Finding, Status
 
@@ -22,6 +22,9 @@ class Suppression(BaseModel):
     Suppressed findings stay in the report (marked and counted) — nothing is
     silently dropped.
     """
+
+    # A misspelled `reson:` would otherwise parse as a suppression with no reason.
+    model_config = ConfigDict(extra="forbid")
 
     # --- what it applies to (at least one required) ---
     dedupe_key: str | None = None   # exact finding fingerprint; strongest match

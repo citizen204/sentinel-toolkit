@@ -63,7 +63,44 @@ All notable changes to this project are documented here. The format is based on
   doesn't matter. Suppressed findings are excluded from trend and rollups — an accepted risk isn't
   an open one.
 
+- **Scan coverage travels with the report** (`ReportEnvelope` v1): every JSON report now
+  carries `schema_version`, `run_id`, `tool_version`, `ruleset_digest`, `config_digest`, and a
+  `coverage` block recording each scanner's outcome plus the accounts, regions, and rules the
+  run actually assessed.
+- **`sentinel diff` gained an `unassessed` bucket.** A finding missing from the newer run is
+  reported as resolved *only* if that run covered its scanner, rule, account, and region;
+  otherwise its status is unknown. The dashboard shows the same bucket, computed the same way.
+- **A scanner with no input now says so** (`SCANNER-SKIPPED`) instead of returning an empty
+  list, and a partially-readable log set reports the files it could not read
+  (`LOG-SOURCE-ERROR`). Neither can be filtered away by `ignore_ids`.
+- **Customer managed policy admin check** (`CLOUD-IAM-CUSTOM-POLICY-ADMIN`) and **strict S3 BPA
+  check** (`CLOUD-S3-BPA-NOT-STRICT`), which evaluate what AWS IAM.1 and CIS 2.1.4 actually
+  evaluate. See "Fixed" below for why the previous mappings were wrong.
+- **Supply-chain gating with teeth**: every GitHub Action is pinned to a full commit SHA and
+  Syft/Trivy to image digests; fixable CRITICAL/HIGH vulnerabilities in *application*
+  dependencies now fail the build, while unfixable base-image CVEs continue to report into the
+  Security tab. A new `requirements.lock` constrains the image build, and CI fails if the built
+  image drifts from it.
+
 ### Fixed
+- **Security groups no longer miss the worst rule there is.** `IpProtocol: -1` (all protocols,
+  all ports) carries no port range, so a range-only check returned *nothing* for a group open
+  to the entire internet. Protocol is now handled explicitly: `-1` is reported as all-ports
+  exposure in its own right, and UDP on port 22 is no longer labelled "SSH".
+- **IAM admin detection no longer trusts a policy's name.** A customer managed policy called
+  `AdministratorAccess` that grants only `s3:GetObject` was reported as admin without its
+  document ever being read; only the AWS-managed ARN is now trusted by identity. All five IAM
+  list calls paginate, so admin paths past the first page are no longer invisible, and policy
+  documents are cached across users.
+- **Config typos are rejected instead of ignored.** `aws_regons`, `threhsold`, and `reson`
+  parsed happily and did nothing; every config model is now `extra="forbid"`.
+- **CIS mappings corrected.** `CLOUD-IAM-EFFECTIVE-ADMIN` was mapped to CIS 1.16 / AWS IAM.1,
+  which evaluates *customer managed policies only* — explicitly not the inline and AWS-managed
+  paths that rule follows. `CLOUD-S3-NO-BPA` was mapped to CIS 2.1.4, which Security Hub splits
+  into S3.1 (account) **and** S3.8 (bucket), both required; that rule passes on either. Both ids
+  were real and correctly transcribed — the mappings were still wrong, because the rules didn't
+  test what the controls test. Both are now unmapped, with mapped counterparts alongside them
+  and the reasoning recorded in `docs/compliance.md`.
 - **`s3control` is called with an explicit region.** Account-level Block Public Access would
   raise `NoRegionError` on a session without a default region; the region is now resolved from
   the scan scope and recorded in the finding's evidence.

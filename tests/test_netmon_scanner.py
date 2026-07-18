@@ -1,5 +1,7 @@
+import pytest
+
 from sentinel.core.config import Config
-from sentinel.core.scanner import all_scanners
+from sentinel.core.scanner import ScannerSkipped, all_scanners
 
 
 def test_netmon_registered():
@@ -21,9 +23,19 @@ def test_run_reads_capture_file(tmp_path):
     assert ids == {"NET-PORT-SCAN", "NET-HOST-SWEEP"}
 
 
-def test_run_no_capture_returns_empty():
+def test_run_without_capture_is_skipped_not_clean():
     from sentinel.modules.netmon.scanner import NetmonScanner
-    assert NetmonScanner().run(Config()) == []
+
+    with pytest.raises(ScannerSkipped):
+        NetmonScanner().run(Config())
+
+
+def test_run_with_missing_capture_file_is_skipped(tmp_path):
+    """A typo'd capture path used to read as "no reconnaissance detected"."""
+    from sentinel.modules.netmon.scanner import NetmonScanner
+
+    with pytest.raises(ScannerSkipped):
+        NetmonScanner().run(Config(capture_file=str(tmp_path / "nope.txt")))
 
 
 def test_run_reads_pcap_capture(tmp_path):

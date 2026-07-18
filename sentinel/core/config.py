@@ -4,13 +4,23 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .finding import Severity
 from .suppression import Suppression
 
 
-class RuleConfig(BaseModel):
+class StrictModel(BaseModel):
+    """Base for every config model: an unrecognised key is an error, not a no-op.
+
+    Without this, `aws_regons: [us-east-1]` parses happily, `aws_regions` stays
+    empty, and the scan quietly covers nothing the operator asked for.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class RuleConfig(StrictModel):
     """Per-rule overrides. Anything left unset falls back to the rule/profile."""
 
     enabled: bool | None = None      # force a rule on/off regardless of profile
@@ -18,7 +28,7 @@ class RuleConfig(BaseModel):
     threshold: int | None = None      # for threshold-based rules (brute force, scans)
 
 
-class AwsAccount(BaseModel):
+class AwsAccount(StrictModel):
     """A target account to audit by assuming a role into it."""
 
     role_arn: str
@@ -26,7 +36,7 @@ class AwsAccount(BaseModel):
     regions: list[str] = Field(default_factory=list)  # falls back to aws_regions
 
 
-class Config(BaseModel):
+class Config(StrictModel):
     aws_profile: str | None = None
     aws_regions: list[str] = Field(default_factory=list)
     aws_accounts: list[AwsAccount] = Field(default_factory=list)
