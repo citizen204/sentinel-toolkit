@@ -7,19 +7,26 @@
 # Regenerate: pip install . into a clean venv, then
 #   pip freeze --exclude-editable | grep -iv '^sentinel' > requirements.lock
 # Dev/test extras are deliberately excluded - they never reach the image.
+#
+# Two entries do not correspond one-to-one with the Linux image, and both are
+# intentional. Constraints only bind packages that are actually installed, so a
+# listed-but-absent entry is inert:
+#   [base] ships preinstalled in python:3.11-slim rather than being ours.
+#   [win]  is a Windows-only marker dependency, absent from the image.
 annotated-doc==0.0.4
 annotated-types==0.7.0
 boto3==1.43.51
 botocore==1.43.51
 certifi==2026.6.17
 charset-normalizer==3.4.9
-colorama==0.4.6
+colorama==0.4.6  # [win] sys_platform == 'win32' only
 idna==3.18
 Jinja2==3.1.6
 jmespath==1.1.0
 markdown-it-py==4.2.0
 MarkupSafe==3.0.3
 mdurl==0.1.2
+packaging==26.2  # [base] preinstalled in python:3.11-slim
 pydantic==2.13.4
 pydantic_core==2.46.4
 Pygments==2.20.0
