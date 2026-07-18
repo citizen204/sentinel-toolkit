@@ -43,9 +43,10 @@ jobs:
           def read(path):
               out = {}
               for line in open(path, encoding="utf-8"):
+                  line = line.split("#")[0].strip()  # pip-style inline comments
                   if "==" in line:
-                      name, version = line.strip().split("==")
-                      out[name.lower().replace("_", "-")] = version
+                      name, version = line.split("==")
+                      out[name.strip().lower().replace("_", "-")] = version.strip()
               return out
 
           locked, installed = read("requirements.lock"), read("installed.txt")
