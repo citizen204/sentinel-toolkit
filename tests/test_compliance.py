@@ -8,11 +8,13 @@ from sentinel.core.finding import Finding, Severity
 from sentinel.core.rule import RULES, apply_rule_config, build_finding
 
 # Verified against the AWS Security Hub CIS mapping table (see docs/compliance.md).
+# A control id is carried only when the rule evaluates what the control evaluates —
+# matching on the control's *theme* is how a mapping ends up plausible but wrong.
 _EXPECTED = {
     "CLOUD-SG-OPEN-INGRESS": ["CIS-AWS-3.0.0:5.2", "CIS-AWS-3.0.0:5.3"],
-    "CLOUD-S3-NO-BPA": ["CIS-AWS-3.0.0:2.1.4"],
+    "CLOUD-S3-BPA-NOT-STRICT": ["CIS-AWS-3.0.0:2.1.4"],
     "CLOUD-RDS-UNENCRYPTED": ["CIS-AWS-3.0.0:2.3.1"],
-    "CLOUD-IAM-EFFECTIVE-ADMIN": ["CIS-AWS-1.4.0:1.16"],
+    "CLOUD-IAM-CUSTOM-POLICY-ADMIN": ["CIS-AWS-1.4.0:1.16"],
 }
 
 # Documented as deliberately unmapped — see docs/compliance.md for the reasoning.
@@ -23,7 +25,27 @@ _UNMAPPED = [
     "CLOUD-IAM-NO-PASSWORD-POLICY",  # CIS 1.8/1.9 assert specific parameters
     "CLOUD-S3-PUBLIC",
     "CLOUD-S3-NO-VERSIONING",
+    # IAM.1 checks customer managed policies only, not user-reachable paths.
+    "CLOUD-IAM-EFFECTIVE-ADMIN",
+    # CIS 2.1.4 needs account AND bucket level; this rule passes on either.
+    "CLOUD-S3-NO-BPA",
 ]
+
+
+def test_risk_and_compliance_rules_are_kept_separate():
+    """The two rules in each pair ask different questions and must not merge.
+
+    Both mis-mappings this guards against used a real control id on a rule that
+    checked something adjacent to it — the failure mode is a mapping that survives
+    review because the id itself checks out.
+    """
+    import sentinel.modules  # noqa: F401
+    for risk, compliance in [
+        ("CLOUD-IAM-EFFECTIVE-ADMIN", "CLOUD-IAM-CUSTOM-POLICY-ADMIN"),
+        ("CLOUD-S3-NO-BPA", "CLOUD-S3-BPA-NOT-STRICT"),
+    ]:
+        assert RULES[risk].compliance == []
+        assert RULES[compliance].compliance != []
 
 
 def test_mapped_rules_carry_the_verified_control_ids():

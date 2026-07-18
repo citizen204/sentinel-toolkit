@@ -33,8 +33,23 @@ export interface Finding {
   timestamp: string;
 }
 
+export type CoverageStatus = "ok" | "error" | "skipped";
+
+export interface ScanCoverage {
+  scanners: Record<string, CoverageStatus>;
+  accounts: string[];
+  regions: string[];
+  rules: string[];
+}
+
 export interface Report {
+  schema_version?: string;
+  run_id?: string;
+  tool_version?: string;
   generated_at: string;
+  ruleset_digest?: string;
+  config_digest?: string;
+  coverage?: ScanCoverage;
   summary: Record<Severity, number>;
   suppressed?: number;
   findings: Finding[];

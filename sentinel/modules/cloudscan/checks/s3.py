@@ -211,3 +211,60 @@ def check_bucket_public_access_block(
             )
         )
     return findings
+
+
+def check_bucket_public_access_block_strict(
+    session, account_id: str | None = None, region: str | None = None
+) -> list[Finding]:
+    """Flag buckets where BPA is set at only one of the two levels.
+
+    CIS 2.1.4 maps to two Security Hub controls - S3.1 (account) and S3.8 (bucket) -
+    and both must pass. `check_bucket_public_access_block` answers the risk question
+    (is this bucket protected *at all*); this answers the compliance question, and
+    conflating the two would let Sentinel claim CIS coverage it hasn't established.
+    """
+    s3 = session.client("s3")
+    account_blocked, bpa_region = _account_bpa_fully_blocked(session, region)
+    findings: list[Finding] = []
+    for name in _bucket_names(s3):
+        bucket_blocked = _bucket_bpa_fully_blocked(s3, name)
+        if bucket_blocked and account_blocked:
+            continue
+        # Fully unprotected buckets are already reported by CLOUD-S3-NO-BPA.
+        if not bucket_blocked and not account_blocked:
+            continue
+        missing = "bucket" if account_blocked else "account"
+        findings.append(
+            build_finding(
+                "CLOUD-S3-BPA-NOT-STRICT",
+                description=(
+                    f"S3 bucket '{name}' has Block Public Access at the "
+                    f"{'account' if account_blocked else 'bucket'} level only; "
+                    f"CIS 2.1.4 requires both levels."
+                ),
+                remediation=(
+                    f"Enable all four Block Public Access settings at the {missing} "
+                    f"level as well."
+                ),
+                asset=_bucket_asset(name, account_id),
+                evidence={
+                    "bucket": name,
+                    "bucket_bpa": bucket_blocked,
+                    "account_bpa": account_blocked,
+                    "missing_level": missing,
+                    "required_settings": list(_BPA_KEYS),
+                    "account_bpa_region": bpa_region,
+                },
+                api="s3:GetPublicAccessBlock + s3:GetAccountPublicAccessBlock",
+                rationale=(
+                    f"Bucket-level fully blocked = {bucket_blocked}, account-level = "
+                    f"{account_blocked}. The bucket is not publicly exposed right now, "
+                    f"but CIS 2.1.4 is satisfied only when both S3.1 (account) and S3.8 "
+                    f"(bucket) pass, so a single change to the {'account' if account_blocked else 'bucket'} "
+                    f"setting would expose it."
+                ),
+                verify=f"aws s3api get-public-access-block --bucket {name}",
+                resource=name,
+            )
+        )
+    return findings

@@ -9,11 +9,12 @@ from sentinel.core.scanner import BaseScanner
 
 from .checks.ebs import check_unencrypted_volumes
 from .checks.iam import check_password_policy, check_users_without_mfa
-from .checks.iam_privilege import check_effective_admin
+from .checks.iam_privilege import check_customer_managed_admin, check_effective_admin
 from .checks.rds import check_unencrypted_databases
 from .checks.s3 import (
     check_bucket_encryption,
     check_bucket_public_access_block,
+    check_bucket_public_access_block_strict,
     check_bucket_versioning,
     check_public_buckets,
 )
@@ -93,6 +94,12 @@ def _scan_session(session, regions: list[str]) -> list[Finding]:
         lambda: check_bucket_public_access_block(session, account, primary_region),
     )
     findings += _run_check(
+        "s3_block_public_access_strict",
+        lambda: check_bucket_public_access_block_strict(
+            session, account, primary_region
+        ),
+    )
+    findings += _run_check(
         "open_security_groups",
         lambda: check_open_security_groups(session, regions, account),
     )
@@ -104,6 +111,10 @@ def _scan_session(session, regions: list[str]) -> list[Finding]:
     )
     findings += _run_check(
         "iam_effective_admin", lambda: check_effective_admin(session, account)
+    )
+    findings += _run_check(
+        "iam_customer_managed_admin",
+        lambda: check_customer_managed_admin(session, account),
     )
     findings += _run_check(
         "ebs_encryption", lambda: check_unencrypted_volumes(session, regions, account)
@@ -132,14 +143,30 @@ class CloudScanner(BaseScanner):
         )
 
         if not config.aws_accounts:
-            return _scan_session(base, config.aws_regions)
+            return self._record(_scan_session(base, config.aws_regions))
 
         findings: list[Finding] = []
         for account in config.aws_accounts:
             try:
                 session = assume_role_session(base, account.role_arn)
             except Exception as exc:  # noqa: BLE001 - isolate one bad account
+                # Deliberately not recorded as scanned: an account we could not
+                # assume into must never make its old findings look resolved.
                 findings += _check_error(f"assume_role[{account.role_arn}]", exc)
                 continue
             findings += _scan_session(session, account.regions or config.aws_regions)
+        return self._record(findings)
+
+    def _record(self, findings: list[Finding]) -> list[Finding]:
+        """Note which accounts and regions this run actually reached.
+
+        Derived from the assets that came back, so it reflects what was really
+        enumerated rather than what was requested.
+        """
+        self.scanned_accounts = sorted(
+            {f.asset.account_id for f in findings if f.asset and f.asset.account_id}
+        )
+        self.scanned_regions = sorted(
+            {f.asset.region for f in findings if f.asset and f.asset.region}
+        )
         return findings

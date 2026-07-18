@@ -8,9 +8,10 @@ import typer
 from sentinel import modules  # noqa: F401  (imports register future scanners)
 from sentinel.core import report as report_mod
 from sentinel.core.config import load_config
+from sentinel.core.envelope import CoverageStatus, ScanCoverage, build_envelope
 from sentinel.core.finding import Finding, Severity
 from sentinel.core.rule import apply_rule_config
-from sentinel.core.scanner import all_scanners
+from sentinel.core.scanner import ScannerSkipped, all_scanners
 from sentinel.core.suppression import apply_suppressions
 
 
@@ -23,16 +24,62 @@ class OutputFormat(str, Enum):
 
 
 def run_scanners(scanners, config) -> list[Finding]:
-    """Run each scanner, isolating failures.
+    """Run each scanner, isolating failures. See `run_scanners_with_coverage`."""
+    return run_scanners_with_coverage(scanners, config)[0]
+
+
+def run_scanners_with_coverage(scanners, config) -> tuple[list[Finding], ScanCoverage]:
+    """Run each scanner, isolating failures, and record what was actually covered.
 
     If one scanner raises, the others still run and the failure is surfaced as an
-    INFO finding rather than crashing the whole scan.
+    INFO finding rather than crashing the whole scan. The coverage record is what
+    lets a later diff tell "fixed" apart from "never looked at".
     """
     findings: list[Finding] = []
+    coverage = ScanCoverage()
     for name, scanner_cls in scanners.items():
+        scanner = scanner_cls()
         try:
-            findings.extend(scanner_cls().run(config))
+            produced = scanner.run(config)
+            findings.extend(produced)
+            # A check that raised leaves its slice of the account unknown. Scope is
+            # tracked per scanner, not per check, so any check error demotes the
+            # whole scanner rather than overstating what was covered.
+            failed_check = any(
+                f.module == name and f.id.endswith("-ERROR") for f in produced
+            )
+            coverage.scanners[name] = (
+                CoverageStatus.ERROR if failed_check else CoverageStatus.OK
+            )
+            coverage.accounts = sorted(
+                set(coverage.accounts) | set(getattr(scanner, "scanned_accounts", []))
+            )
+            coverage.regions = sorted(
+                set(coverage.regions) | set(getattr(scanner, "scanned_regions", []))
+            )
+        except ScannerSkipped as skip:
+            coverage.scanners[name] = CoverageStatus.SKIPPED
+            findings.append(
+                Finding(
+                    id="SCANNER-SKIPPED",
+                    module=name,
+                    severity=Severity.INFO,
+                    title=f"Scanner '{name}' did not run",
+                    description=skip.reason,
+                    remediation=(
+                        skip.remediation
+                        or f"Configure an input for '{name}', or exclude it from the run."
+                    ),
+                    rationale=(
+                        f"'{name}' had nothing to assess, so this run says nothing about "
+                        f"what it covers. This is not a pass."
+                    ),
+                    evidence={"scanner": name, "reason": skip.reason},
+                    resource=name,
+                )
+            )
         except Exception as exc:  # noqa: BLE001 - intentionally isolate any scanner failure
+            coverage.scanners[name] = CoverageStatus.ERROR
             findings.append(
                 Finding(
                     id="SCANNER-ERROR",
@@ -41,16 +88,35 @@ def run_scanners(scanners, config) -> list[Finding]:
                     title=f"Scanner '{name}' failed to run",
                     description=f"{type(exc).__name__}: {exc}",
                     remediation="Check this scanner's configuration and credentials.",
+                    rationale=(
+                        f"'{name}' raised before finishing, so its scope is unknown "
+                        f"rather than clean."
+                    ),
                     evidence={"scanner": name, "error": str(exc)},
                     resource=name,
                 )
             )
-    return findings
+    return findings, coverage
+
+
+def _enabled_rule_ids(config) -> list[str]:
+    """Rule ids this run was allowed to report.
+
+    Recorded so that turning a rule off, or switching profile, is distinguishable
+    from its findings having been fixed.
+    """
+    from sentinel.core.rule import RULES, rule_enabled
+
+    return sorted(rid for rid in RULES if rule_enabled(rid, config))
 
 
 def _is_error_finding(rule_id: str) -> bool:
-    """Error findings (scanner/check failures) end in -ERROR and are protected."""
-    return rule_id.endswith("-ERROR")
+    """Coverage findings are protected from being filtered away.
+
+    A failed check (-ERROR) and a scanner that never ran (-SKIPPED) both mean
+    "unknown", and config must not be able to turn unknown into silence.
+    """
+    return rule_id.endswith(("-ERROR", "-SKIPPED"))
 
 
 def filter_ignored(findings, ignore_ids) -> list[Finding]:
@@ -72,10 +138,12 @@ app = typer.Typer(
 )
 
 
-def _emit_reports(findings, output_dir: str, fmt) -> None:
+def _emit_reports(findings, output_dir: str, fmt, envelope=None) -> None:
     fmt = fmt.value if isinstance(fmt, OutputFormat) else fmt
     if fmt in ("json", "both", "all"):
-        typer.echo(f"JSON report: {report_mod.write_json(findings, output_dir)}")
+        typer.echo(
+            f"JSON report: {report_mod.write_json(findings, output_dir, envelope)}"
+        )
     if fmt in ("html", "both", "all"):
         typer.echo(f"HTML report: {report_mod.write_html(findings, output_dir)}")
     if fmt in ("sarif", "all"):
@@ -191,11 +259,18 @@ def scan_all(
     except ValueError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1)
-    findings = run_scanners(selected, cfg)
+    findings, coverage = run_scanners_with_coverage(selected, cfg)
     findings = apply_rule_config(findings, cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
     findings = apply_suppressions(findings, cfg.suppressions)
-    _emit_reports(findings, output_dir or cfg.output_dir, fmt)
+    # Scanners excluded from this run are recorded as skipped rather than omitted,
+    # so a later diff won't read their absent findings as fixed.
+    for name in all_scanners():
+        coverage.scanners.setdefault(name, CoverageStatus.SKIPPED)
+    coverage.rules = _enabled_rule_ids(cfg)
+    _emit_reports(
+        findings, output_dir or cfg.output_dir, fmt, build_envelope(cfg, coverage)
+    )
 
 
 @app.command("scan")
@@ -216,11 +291,16 @@ def scan(
         typer.echo(f"Unknown scanner '{name}'. Available: {available}")
         raise typer.Exit(code=1)
     cfg = _load_validated_config(config)
-    findings = scanners[name]().run(cfg)
+    findings, coverage = run_scanners_with_coverage({name: scanners[name]}, cfg)
     findings = apply_rule_config(findings, cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
     findings = apply_suppressions(findings, cfg.suppressions)
-    _emit_reports(findings, output_dir or cfg.output_dir, fmt)
+    for other in all_scanners():
+        coverage.scanners.setdefault(other, CoverageStatus.SKIPPED)
+    coverage.rules = _enabled_rule_ids(cfg)
+    _emit_reports(
+        findings, output_dir or cfg.output_dir, fmt, build_envelope(cfg, coverage)
+    )
 
 
 _SAMPLE_CONFIG = """\
@@ -285,7 +365,7 @@ def diff(
     old: str = typer.Argument(..., help="Path to the older report.json."),
     new: str = typer.Argument(..., help="Path to the newer report.json."),
 ) -> None:
-    """Compare two JSON reports: new, resolved, and persisting findings."""
+    """Compare two JSON reports: new, resolved, persisting, and unassessed findings."""
     import json
 
     from sentinel.core.diff import diff_reports
@@ -297,10 +377,20 @@ def diff(
     typer.echo(f"New:        {len(result['new'])}")
     typer.echo(f"Resolved:   {len(result['resolved'])}")
     typer.echo(f"Persisting: {len(result['persisting'])}")
+    typer.echo(f"Unassessed: {len(result['unassessed'])}")
     for f in result["new"]:
         typer.echo(f"  + [{f.get('severity')}] {f.get('id')}  {f.get('resource', '')}")
     for f in result["resolved"]:
         typer.echo(f"  - [{f.get('severity')}] {f.get('id')}  {f.get('resource', '')}")
+    for f in result["unassessed"]:
+        typer.echo(f"  ? [{f.get('severity')}] {f.get('id')}  {f.get('resource', '')}")
+    if result["unassessed"]:
+        typer.echo(
+            "\n'?' findings were present before and were not covered by the newer "
+            "run. They are not resolved - their status is unknown."
+        )
+    for warning in result["warnings"]:
+        typer.echo(f"\nWarning: {warning}")
 
 
 def main() -> None:

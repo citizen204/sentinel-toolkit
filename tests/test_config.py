@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from sentinel.core.config import load_config
 
 
@@ -99,3 +102,41 @@ def test_empty_yaml_file_yields_defaults(tmp_path):
     cfg_file.write_text("")
     cfg = load_config(cfg_file)
     assert cfg.output_dir == "reports"
+
+
+def test_misspelled_key_is_rejected(tmp_path):
+    """`aws_regons` used to parse fine, leaving aws_regions empty and scanning nothing."""
+    cfg_file = tmp_path / "typo.yaml"
+    cfg_file.write_text("aws_regons:\n  - us-east-1\n", encoding="utf-8")
+
+    with pytest.raises(ValidationError) as exc:
+        load_config(cfg_file)
+
+    assert "aws_regons" in str(exc.value)
+
+
+def test_misspelled_nested_keys_are_rejected(tmp_path):
+    cfg_file = tmp_path / "typo.yaml"
+    cfg_file.write_text(
+        "rules:\n"
+        "  LOG-BRUTEFORCE:\n"
+        "    threhsold: 10\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError):
+        load_config(cfg_file)
+
+
+def test_misspelled_suppression_reason_is_rejected(tmp_path):
+    """A silently-dropped `reson:` leaves an accepted risk with no recorded reason."""
+    cfg_file = tmp_path / "typo.yaml"
+    cfg_file.write_text(
+        "suppressions:\n"
+        "  - rule: CLOUD-IAM-NO-MFA\n"
+        "    reson: service account\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValidationError):
+        load_config(cfg_file)

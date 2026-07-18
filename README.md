@@ -160,8 +160,56 @@ rejected instead of silently producing nothing.
 Track posture over time by diffing two JSON reports:
 
 ```bash
-sentinel diff reports/last-week.json reports/today.json   # new / resolved / persisting
+sentinel diff reports/last-week.json reports/today.json
 ```
+
+```console
+New:        1
+Resolved:   2
+Persisting: 7
+Unassessed: 3
+
+  ? [High] CLOUD-RDS-UNENCRYPTED  legacy-db
+
+'?' findings were present before and were not covered by the newer run.
+They are not resolved - their status is unknown.
+
+Warning: The newer run did not fully cover: cloudscan.
+```
+
+## 🧾 "Resolved" has to be earned
+
+A finding that disappears between two scans has two possible explanations: someone fixed it, or
+nobody looked. A scanner that can't tell the difference will eventually report an unscanned
+region as remediated — and talk an operator out of a real exposure.
+
+So every report carries what the run actually **covered**, not just what it found:
+
+```json
+{
+  "schema_version": "1.0",
+  "run_id": "b6f1…", "tool_version": "0.1.0",
+  "ruleset_digest": "4f53cda18c2baa0c", "config_digest": "9c1185a5c5e9fc54",
+  "coverage": {
+    "scanners": { "cloudscan": "ok", "netmon": "skipped" },
+    "accounts": ["123456789012"],
+    "regions": ["us-east-1", "ap-southeast-2"],
+    "rules": ["CLOUD-SG-OPEN-INGRESS", "..."]
+  }
+}
+```
+
+`sentinel diff` calls a finding **resolved** only when the newer run covered its scanner, its
+rule, its account, and its region. Everything else is **unassessed**. Which means:
+
+- a role that lost `rds:DescribeDBInstances` → `unassessed`, not resolved
+- a region dropped from `aws_regions` → `unassessed`, not resolved
+- a rule switched off, or a profile change → `unassessed`, not resolved
+- a scanner with no input configured → reported as `SCANNER-SKIPPED`, never as a clean pass
+
+The two digests catch the subtler case: if the rule catalog or the config changed between runs,
+the diff says so, because a renamed or re-rated rule changes finding identity and can mimic a
+fix. The dashboard computes this from the same fields, so the UI and the CLI can't disagree.
 
 ## 📋 Compliance mapping
 
@@ -190,8 +238,9 @@ A Next.js + Tailwind UI: severity summary, per-severity filtering, a card per fi
 
 Drop in **several runs at once** and it becomes a posture tracker:
 
-- **Since the previous run** — new / resolved / persisting, matched on the same `dedupe_key`
-  the CLI's `sentinel diff` uses, so the UI and the CLI can't disagree.
+- **Since the previous run** — new / resolved / persisting / **unassessed**, matched on the same
+  `dedupe_key` the CLI's `sentinel diff` uses and gated by the same coverage rules, so the UI and
+  the CLI can't disagree.
 - **Open findings over time** — a severity-stacked bar per run (suppressed findings excluded,
   since an accepted risk isn't open).
 - **By module / account / region** — where the risk actually concentrates.
@@ -290,10 +339,19 @@ pytest -q          # 140+ tests, fully offline
 
 Every push and pull request runs on GitHub Actions (see the badges above): **pytest + `ruff`
 lint** for the toolkit, a **dashboard eslint + build** job, and **CodeQL** static analysis for
-Python and TypeScript. A **supply-chain** job builds the container, asserts it doesn't run as
-root, emits a **CycloneDX SBOM**, and **Trivy**-scans the image into the Security tab.
-**Dependabot** keeps pip, npm, Actions, and the base image up to date. No test touches a real
-cloud account, host, or network.
+Python and TypeScript.
+
+The **supply-chain** job builds the container, asserts it doesn't run as root, checks the image
+against `requirements.lock`, emits a **CycloneDX SBOM**, and runs **Trivy** twice on purpose:
+
+- **fixable CRITICAL/HIGH in our own dependencies → the build fails.** These are actionable here.
+- **everything else, including unfixable base-image CVEs → reported to the Security tab.**
+  Failing on those would mean a red build nobody can turn green, which just teaches people to
+  ignore it.
+
+Every action is pinned to a full commit SHA and every tool image to a digest — a tag can be
+repointed by whoever owns it, a digest can't. **Dependabot** keeps pip, npm, Actions, and the
+base image current. No test touches a real cloud account, host, or network.
 
 ## 🗺️ Roadmap
 
@@ -305,8 +363,12 @@ cloud account, host, or network.
 - [x] Suppressions (rule/resource/expiry/reason) and `sentinel diff` (new/resolved/persisting)
 - [x] CIS AWS Benchmark mapping (`profile: cis`) with the gaps written down, not papered over
 - [x] Posture tracker in the dashboard: run history, diff, trend, and account/region rollups
-- [ ] Markdown output format
+- [x] Provable scan coverage: report envelope, `unassessed` bucket, no silently-empty scans
+- [x] Supply-chain gating: SHA-pinned actions, digest-pinned tools, dependency lock, blocking scan
+- [ ] `--fail-on High` / `--fail-on-incomplete` exit codes for CI gating
+- [ ] Published JSON Schema for the report format
 - [ ] IAM privilege-escalation chains, permission boundaries, SCPs
+- [ ] Markdown output format
 
 ## 🤝 Contributing
 

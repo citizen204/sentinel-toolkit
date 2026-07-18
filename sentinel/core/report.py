@@ -7,6 +7,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
+from .envelope import ReportEnvelope
 from .finding import Finding, Severity, Status
 
 _SEVERITY_ORDER = [
@@ -33,15 +34,41 @@ def _timestamped_path(output_dir: str | Path, ext: str, when: datetime) -> Path:
     return out / f"report-{when.strftime('%Y%m%dT%H%M%S')}.{ext}"
 
 
-def write_json(findings: list[Finding], output_dir: str | Path) -> Path:
-    when = datetime.now(timezone.utc)
-    path = _timestamped_path(output_dir, "json", when)
-    payload = {
+def build_payload(
+    findings: list[Finding],
+    envelope: ReportEnvelope | None = None,
+    when: datetime | None = None,
+) -> dict:
+    """The JSON report body.
+
+    The envelope fields sit at the top level so a consumer can read coverage
+    without parsing findings -- and so `sentinel diff` can refuse to call
+    anything resolved that the newer run never covered.
+    """
+    envelope = envelope or ReportEnvelope()
+    when = when or datetime.now(timezone.utc)
+    return {
+        "schema_version": envelope.schema_version,
+        "run_id": envelope.run_id,
+        "tool_version": envelope.tool_version,
         "generated_at": when.isoformat(),
+        "ruleset_digest": envelope.ruleset_digest,
+        "config_digest": envelope.config_digest,
+        "coverage": envelope.coverage.model_dump(mode="json"),
         "summary": summarize(findings),
         "suppressed": count_suppressed(findings),
         "findings": [f.model_dump(mode="json") for f in findings],
     }
+
+
+def write_json(
+    findings: list[Finding],
+    output_dir: str | Path,
+    envelope: ReportEnvelope | None = None,
+) -> Path:
+    when = datetime.now(timezone.utc)
+    path = _timestamped_path(output_dir, "json", when)
+    payload = build_payload(findings, envelope, when)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return path
 

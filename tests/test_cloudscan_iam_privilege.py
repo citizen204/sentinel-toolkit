@@ -2,6 +2,9 @@ import boto3
 from moto import mock_aws
 
 from sentinel.modules.cloudscan.checks.iam_privilege import (
+    _managed_policy_is_admin,
+    admin_paths,
+    check_customer_managed_admin,
     check_effective_admin,
     is_admin_document,
 )
@@ -115,3 +118,113 @@ def test_least_privilege_user_is_not_flagged(aws_credentials):
     iam.attach_user_policy(UserName="scoped-user", PolicyArn=arn)
 
     assert check_effective_admin(session) == []
+
+
+@mock_aws
+def test_customer_policy_named_administratoraccess_is_judged_on_content(aws_credentials):
+    """A name is not a grant.
+
+    Matching on PolicyName started life as a workaround for moto not preloading AWS
+    managed policies, and it invented admin users out of naming conventions.
+    """
+    session = boto3.Session(region_name="us-east-1")
+    iam = session.client("iam")
+    arn = iam.create_policy(
+        PolicyName="AdministratorAccess", PolicyDocument=_READONLY_DOC
+    )["Policy"]["Arn"]
+    iam.create_user(UserName="misleadingly-named")
+    iam.attach_user_policy(UserName="misleadingly-named", PolicyArn=arn)
+
+    assert check_effective_admin(session) == []
+
+
+def test_only_the_aws_managed_admin_arn_short_circuits():
+    """The AWS-managed ARN is trusted without a lookup; a same-named customer one is not."""
+    class Unreadable:
+        def get_policy(self, PolicyArn):
+            raise AssertionError(f"should have read the document for {PolicyArn}")
+
+    cache: dict[str, bool] = {}
+    assert _managed_policy_is_admin(
+        Unreadable(), "arn:aws:iam::aws:policy/AdministratorAccess", cache
+    )
+    # commercial, China, and GovCloud partitions all qualify
+    assert _managed_policy_is_admin(
+        Unreadable(), "arn:aws-cn:iam::aws:policy/AdministratorAccess", cache
+    )
+    assert _managed_policy_is_admin(
+        Unreadable(), "arn:aws-us-gov:iam::aws:policy/AdministratorAccess", cache
+    )
+
+
+class _FakePaginator:
+    def __init__(self, pages_for):
+        self._pages_for = pages_for
+
+    def paginate(self, **kwargs):
+        return iter(self._pages_for(kwargs))
+
+
+class _TruncatingIam:
+    """An IAM stub that really splits results across pages.
+
+    moto returns every item in a single response, so a moto-based test passes
+    whether or not the code paginates. Only a stub can prove the paginator is used,
+    and the bare list_* methods raise here to make first-page-only access fail loudly.
+    """
+
+    def get_paginator(self, operation):
+        return _FakePaginator(lambda kwargs: self._pages(operation, kwargs))
+
+    def _pages(self, operation, kwargs):
+        if operation == "list_groups_for_user":
+            # The admin grant is deliberately on the second page.
+            return [
+                {"Groups": [{"GroupName": "first-page-group"}]},
+                {"Groups": [{"GroupName": "second-page-group"}]},
+            ]
+        if operation == "list_group_policies":
+            if kwargs.get("GroupName") == "second-page-group":
+                return [{"PolicyNames": []}, {"PolicyNames": ["late-admin"]}]
+            return [{"PolicyNames": []}]
+        return [{}]
+
+    def __getattr__(self, name):
+        if name.startswith("list_"):
+            raise AssertionError(f"{name} must be called through a paginator")
+        raise AttributeError(name)
+
+    def get_group_policy(self, GroupName, PolicyName):
+        return {"PolicyDocument": _ADMIN_DOC}
+
+
+def test_admin_paths_reads_every_page():
+    """IAM list calls truncate at 100; stopping at page one reads as 'no admin path'."""
+    paths = admin_paths(_TruncatingIam(), "deep-user")
+
+    assert paths == ["inline policy 'late-admin' via group 'second-page-group'"]
+
+
+# --- the compliance question: customer managed policies, attached or not ------
+
+@mock_aws
+def test_unattached_customer_admin_policy_is_flagged(aws_credentials):
+    """AWS IAM.1 fails the policy itself; attachment is irrelevant."""
+    session = boto3.Session(region_name="us-east-1")
+    iam = session.client("iam")
+    iam.create_policy(PolicyName="DormantAdmin", PolicyDocument=_ADMIN_DOC)
+
+    findings = check_customer_managed_admin(session)
+
+    assert [f.resource for f in findings] == ["DormantAdmin"]
+    assert findings[0].id == "CLOUD-IAM-CUSTOM-POLICY-ADMIN"
+    assert findings[0].evidence["attachment_count"] == 0
+
+
+@mock_aws
+def test_scoped_customer_policy_is_not_flagged(aws_credentials):
+    session = boto3.Session(region_name="us-east-1")
+    iam = session.client("iam")
+    iam.create_policy(PolicyName="Scoped", PolicyDocument=_READONLY_DOC)
+
+    assert check_customer_managed_admin(session) == []

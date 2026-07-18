@@ -1,6 +1,6 @@
-from sentinel.cli import run_scanners
+from sentinel.cli import filter_ignored, run_scanners
 from sentinel.core.finding import Finding, Severity
-from sentinel.core.scanner import BaseScanner
+from sentinel.core.scanner import BaseScanner, ScannerSkipped
 
 
 class _GoodScanner(BaseScanner):
@@ -41,3 +41,30 @@ def test_scanner_error_finding_has_expected_shape():
 def test_all_scanners_succeed_no_error_finding():
     findings = run_scanners({"good": _GoodScanner}, config=None)
     assert all(f.id != "SCANNER-ERROR" for f in findings)
+
+
+class _SkippedScanner(BaseScanner):
+    name = "skipped"
+
+    def run(self, config):
+        raise ScannerSkipped("no input configured")
+
+
+def test_skipped_scanner_is_reported_not_silently_empty():
+    """The whole point: "didn't look" must not render the same as "looked, found nothing"."""
+    findings = run_scanners({"skipped": _SkippedScanner}, config=None)
+
+    skipped = next(f for f in findings if f.id == "SCANNER-SKIPPED")
+    assert skipped.module == "skipped"
+    assert skipped.severity is Severity.INFO
+    assert "no input configured" in skipped.description
+    assert "not a pass" in skipped.rationale
+
+
+def test_skipped_findings_cannot_be_filtered_away():
+    """Config must not be able to turn "unknown" into silence."""
+    findings = run_scanners({"skipped": _SkippedScanner}, config=None)
+
+    kept = filter_ignored(findings, ["SCANNER-SKIPPED"])
+
+    assert any(f.id == "SCANNER-SKIPPED" for f in kept)

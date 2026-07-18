@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sentinel.core.finding import Finding
-from sentinel.core.scanner import BaseScanner
+from sentinel.core.scanner import BaseScanner, ScannerSkipped
 
 from .checks.flows import (
     DEFAULT_HOST_SWEEP_THRESHOLD,
@@ -27,8 +27,17 @@ class NetmonScanner(BaseScanner):
 
     def run(self, config) -> list[Finding]:
         path = getattr(config, "capture_file", None)
-        if not path or not Path(path).exists():
-            return []
+        if not path:
+            raise ScannerSkipped(
+                "No capture_file is configured, so no traffic was analyzed.",
+                "Set capture_file to a flow log or pcap, or exclude netmon.",
+            )
+        if not Path(path).exists():
+            # A typo'd path used to read as "no recon detected".
+            raise ScannerSkipped(
+                f"capture_file '{path}' does not exist, so no traffic was analyzed.",
+                "Correct the capture_file path.",
+            )
         if str(path).lower().endswith((".pcap", ".pcapng")):
             from .capture import flows_from_pcap
             flows = flows_from_pcap(path)
