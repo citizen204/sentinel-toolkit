@@ -228,3 +228,68 @@ def test_scoped_customer_policy_is_not_flagged(aws_credentials):
     iam.create_policy(PolicyName="Scoped", PolicyDocument=_READONLY_DOC)
 
     assert check_customer_managed_admin(session) == []
+
+
+# --- IAM.1 excludes permissions boundary policies ------------------------------
+
+class _BoundaryIam:
+    """IAM stub where the one admin policy is in use as a permissions boundary.
+
+    moto has not implemented put_user_permissions_boundary, so this scenario
+    cannot be built with moto and a stub is the only way to guard the behaviour.
+    """
+
+    def __init__(self, *, used_as_boundary: bool):
+        self.used_as_boundary = used_as_boundary
+        self.entity_queries: list[str] = []
+
+    def get_paginator(self, operation):
+        return _FakePaginator(lambda kwargs: self._pages(operation, kwargs))
+
+    def _pages(self, operation, kwargs):
+        if operation == "list_policies":
+            assert kwargs.get("Scope") == "Local", "IAM.1 is customer-managed only"
+            return [{"Policies": [{
+                "Arn": "arn:aws:iam::123456789012:policy/Guard",
+                "PolicyName": "Guard",
+                "DefaultVersionId": "v1",
+                "AttachmentCount": 1,
+            }]}]
+        if operation == "list_entities_for_policy":
+            self.entity_queries.append(kwargs.get("PolicyUsageFilter"))
+            if self.used_as_boundary:
+                return [{"PolicyUsers": [{"UserName": "bounded"}]}]
+            return [{"PolicyUsers": [], "PolicyRoles": [], "PolicyGroups": []}]
+        return [{}]
+
+    def get_policy_version(self, PolicyArn, VersionId):  # noqa: N803
+        return {"PolicyVersion": {"Document": _ADMIN_DOC}}
+
+
+class _StubSession:
+    def __init__(self, iam):
+        self._iam = iam
+
+    def client(self, service, **kwargs):
+        return self._iam
+
+
+def test_boundary_policy_is_excluded_from_iam1():
+    """A boundary granting */* caps permissions, it does not grant them.
+
+    IAM.1 sets excludePermissionBoundaryPolicy=true, so reporting it would be a
+    false positive against the very control this rule claims to implement.
+    """
+    iam = _BoundaryIam(used_as_boundary=True)
+
+    assert check_customer_managed_admin(_StubSession(iam)) == []
+    assert "PermissionsBoundary" in iam.entity_queries
+
+
+def test_non_boundary_admin_policy_is_still_reported():
+    """The exclusion must not swallow ordinary admin policies."""
+    iam = _BoundaryIam(used_as_boundary=False)
+
+    findings = check_customer_managed_admin(_StubSession(iam))
+
+    assert [f.resource for f in findings] == ["Guard"]

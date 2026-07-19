@@ -22,6 +22,30 @@ def _coverage(report: dict) -> ScanCoverage | None:
     return ScanCoverage.model_validate(raw)
 
 
+def _scope_labels(coverage: ScanCoverage) -> set[str]:
+    """Human-readable (scanner, account, region) scopes that ran to completion."""
+    return {
+        "/".join(
+            part for part in (unit.scanner, unit.account_id, unit.region) if part
+        )
+        for unit in coverage.units
+        if unit.status is CoverageStatus.OK
+    }
+
+
+def _dropped_scopes(
+    old_coverage: ScanCoverage | None, new_coverage: ScanCoverage
+) -> list[str]:
+    """Scopes the previous run covered and this one did not.
+
+    Named explicitly because "3 unassessed findings" does not tell an operator
+    *which* account or region stopped being scanned.
+    """
+    if old_coverage is None:
+        return []
+    return sorted(_scope_labels(old_coverage) - _scope_labels(new_coverage))
+
+
 def _asset_scope(finding: dict) -> tuple[str | None, str | None]:
     asset = finding.get("asset") or {}
     evidence = finding.get("evidence") or {}
@@ -85,13 +109,24 @@ def diff_reports(old_report: dict, new_report: dict) -> dict:
 
     if new_coverage is not None:
         not_ok = [
-            name for name, status in new_coverage.scanners.items()
+            name for name, status in new_coverage.scanner_statuses().items()
             if status is not CoverageStatus.OK
         ]
         if not_ok:
             warnings.append(
                 f"The newer run did not fully cover: {', '.join(sorted(not_ok))}. "
                 f"Findings in that scope are unassessed, not resolved."
+            )
+        if not new_coverage.units:
+            warnings.append(
+                "The newer run recorded no coverage at all, so nothing in it can "
+                "confirm a fix."
+            )
+        dropped = _dropped_scopes(_coverage(old_report), new_coverage)
+        if dropped:
+            warnings.append(
+                f"Scopes covered before but not in the newer run: "
+                f"{', '.join(dropped)}. Their findings are unassessed."
             )
 
     return {

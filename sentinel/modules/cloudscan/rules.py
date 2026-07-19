@@ -19,6 +19,7 @@ SG_OPEN_INGRESS = register_rule(Rule(
     references=["https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html"],
     # 5.2 = IPv4 to remote server administration ports, 5.3 = IPv6. We check both.
     compliance=["CIS-AWS-3.0.0:5.2", "CIS-AWS-3.0.0:5.3"],
+    revision=2,  # protocol-aware matching (-1 / tcp / udp)
 ))
 
 IAM_NO_MFA = register_rule(Rule(
@@ -96,6 +97,7 @@ S3_BPA_NOT_STRICT = register_rule(Rule(
     ],
     compliance=["CIS-AWS-3.0.0:2.1.4"],
     default_enabled=False,
+    revision=2,  # also reports buckets unprotected at both levels
 ))
 
 # --- deeper IAM posture -----------------------------------------------------
@@ -128,6 +130,7 @@ IAM_EFFECTIVE_ADMIN = register_rule(Rule(
     # user-reachable paths including inline and AWS managed policies. Same theme,
     # different assertion. CLOUD-IAM-CUSTOM-POLICY-ADMIN carries that mapping.
     compliance=[],
+    revision=2,  # ARN-only admin match + full pagination
 ))
 
 IAM_CUSTOM_POLICY_ADMIN = register_rule(Rule(
@@ -145,6 +148,7 @@ IAM_CUSTOM_POLICY_ADMIN = register_rule(Rule(
         "https://docs.aws.amazon.com/securityhub/latest/userguide/iam-controls.html#iam-1"
     ],
     compliance=["CIS-AWS-1.4.0:1.16"],
+    revision=2,  # permissions-boundary exclusion
 ))
 
 # --- encryption at rest -----------------------------------------------------

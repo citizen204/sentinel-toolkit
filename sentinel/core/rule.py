@@ -24,6 +24,11 @@ class Rule(BaseModel):
     confidence: Confidence = Confidence.HIGH
     default_enabled: bool = True
     description: str = ""
+    # Bumped whenever the *detection logic* changes, even if this metadata does
+    # not. Without it, tightening or loosening a check leaves the ruleset digest
+    # identical, and a diff attributes the changed findings to the estate rather
+    # than to the rule. Metadata edits are already covered by the digest.
+    revision: int = 1
     # Compliance control ids this rule maps to (e.g. a CIS benchmark control).
     # Intentionally empty until a verified mapping matrix is added — inventing
     # control numbers would be false precision.

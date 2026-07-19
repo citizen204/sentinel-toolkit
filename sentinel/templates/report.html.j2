@@ -32,6 +32,12 @@
             border-radius: 999px; background: #cbd5e1; color: #334155; font-size: 0.75rem; }
     .finding.suppressed { opacity: 0.55; }
     code { background: #eee; padding: 0 0.2rem; }
+    .health { margin: 1rem 0; padding: 0.6rem 0.9rem; border-radius: 6px;
+              font-size: 0.85rem; }
+    .health.complete { background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; }
+    .health.incomplete { background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; }
+    .health ul { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+    .health .ids { color: #78716c; font-size: 0.75rem; margin-top: 0.35rem; }
   </style>
 </head>
 <body>
@@ -42,6 +48,33 @@
       <span class="{{ sev }}">{{ sev }}: {{ count }}</span>
     {% endfor %}
     {% if suppressed %}<span class="supp">Suppressed: {{ suppressed }}</span>{% endif %}
+  </div>
+
+  {# Scan health sits above the findings: a reader must not have to open the JSON
+     to learn that part of the estate was never assessed. #}
+  <div class="health {{ 'complete' if coverage.complete else 'incomplete' }}">
+    {% if coverage.complete %}
+      <strong>Coverage complete.</strong> Every selected scanner ran to completion,
+      so an absent finding here means it was looked for and not found.
+    {% else %}
+      <strong>Coverage incomplete — this report is not a clean bill of health.</strong>
+      {% if coverage.incomplete %}
+        <ul>
+          {% for name in coverage.incomplete %}
+            <li>{{ name }}: {{ coverage.scanners[name] }} — its scope is unassessed.</li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        No coverage was recorded for this run.
+      {% endif %}
+    {% endif %}
+    {% if coverage.scopes %}
+      <div class="ids">Scopes assessed: {{ coverage.scopes | join(', ') }}</div>
+    {% endif %}
+    <div class="ids">
+      run {{ coverage.run_id }} · sentinel {{ coverage.tool_version }} ·
+      ruleset {{ coverage.ruleset_digest }} · config {{ coverage.config_digest }}
+    </div>
   </div>
   {% for f in findings %}
     <div class="finding {{ f.severity.value }}{% if f.status.value == 'suppressed' %} suppressed{% endif %}">

@@ -29,10 +29,11 @@ class BaseScanner(ABC):
     name: str = ""
 
     def __init__(self) -> None:
-        # Scopes this run actually reached. A scanner that enumerates accounts or
-        # regions fills these in so the diff knows where its silence is meaningful.
-        self.scanned_accounts: list[str] = []
-        self.scanned_regions: list[str] = []
+        # Scopes this run actually reached, recorded during execution. A scanner
+        # that enumerates accounts or regions appends a CoverageUnit per scope it
+        # attempted; leaving this empty means "nothing proven", so the diff will
+        # not retire this scanner's earlier findings.
+        self.coverage_units: list = []
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)

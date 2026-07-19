@@ -1,4 +1,4 @@
-import { Finding, Report, ScanCoverage, Severity } from "./types";
+import { CoverageStatus, Finding, Report, ScanCoverage, Severity } from "./types";
 
 export interface ReportDiff {
   added: Finding[];
@@ -18,20 +18,43 @@ function byKey(report: Report): Map<string, Finding> {
   return map;
 }
 
-/** Whether a run is entitled to an opinion about a finding it did not report. */
-function covered(coverage: ScanCoverage, finding: Finding): boolean {
-  if (coverage.scanners?.[finding.module] !== "ok") return false;
-  if (coverage.rules?.length && !coverage.rules.includes(finding.id)) return false;
-  const account = finding.asset?.account_id;
-  if (account && coverage.accounts?.length && !coverage.accounts.includes(account)) {
-    return false;
-  }
+function scopeOf(finding: Finding): [string | null, string | null] {
+  const account = finding.asset?.account_id ?? null;
   const region =
-    finding.asset?.region ?? (finding.evidence?.region as string | undefined);
-  if (region && coverage.regions?.length && !coverage.regions.includes(region)) {
-    return false;
+    finding.asset?.region ?? (finding.evidence?.region as string | undefined) ?? null;
+  return [account, region];
+}
+
+/**
+ * Whether a run is entitled to an opinion about a finding it did not report.
+ *
+ * Mirrors `ScanCoverage.covered` in the toolkit: positive evidence is required.
+ * No matching unit means nothing was proven about that scope, so absence of a
+ * finding proves nothing either.
+ */
+function covered(coverage: ScanCoverage, finding: Finding): boolean {
+  if (coverage.rules?.length && !coverage.rules.includes(finding.id)) return false;
+  const [account, region] = scopeOf(finding);
+  const matching = (coverage.units ?? []).filter(
+    (unit) =>
+      unit.scanner === finding.module &&
+      (unit.account_id ?? null) === account &&
+      (unit.region ?? null) === region,
+  );
+  if (!matching.length) return false;
+  return matching.every((unit) => unit.status === "ok");
+}
+
+/** Worst status per scanner, for the warning line. */
+function scannerStatuses(coverage?: ScanCoverage): Record<string, CoverageStatus> {
+  const worst: Record<string, CoverageStatus> = {};
+  for (const unit of coverage?.units ?? []) {
+    const current = worst[unit.scanner];
+    if (current === undefined || (current === "ok" && unit.status !== "ok")) {
+      worst[unit.scanner] = unit.status;
+    }
   }
-  return true;
+  return worst;
 }
 
 /**
@@ -87,11 +110,16 @@ export function diffReports(older: Report, newer: Report): ReportDiff {
       "The configuration changed between these runs, so they may not cover the same scope.",
     );
   }
-  const notOk = Object.entries(coverage?.scanners ?? {})
+  const notOk = Object.entries(scannerStatuses(coverage))
     .filter(([, status]) => status !== "ok")
     .map(([name]) => name);
   if (notOk.length) {
     warnings.push(`The newer run did not fully cover: ${notOk.sort().join(", ")}.`);
+  }
+  if (coverage && !coverage.units?.length) {
+    warnings.push(
+      "The newer run recorded no coverage at all, so nothing in it can confirm a fix.",
+    );
   }
 
   return { added, resolved, persisting, unassessed, warnings };

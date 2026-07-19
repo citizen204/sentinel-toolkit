@@ -6,6 +6,55 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-19 — Trust kernel
+
+Everything in this release exists to make one claim defensible: **when Sentinel says
+a finding is resolved, it looked.** Two of the fixes below close holes introduced by
+0.1.0's own coverage work.
+
+### Fixed
+- **Empty coverage no longer means "everything covered".** Coverage was inferred from
+  the findings a run produced, so a clean account produced empty account/region lists —
+  and `covered()` read empty as "unconstrained". The cleanest possible scan therefore
+  made the strongest possible claim, retiring findings from accounts it never touched.
+  Coverage is now **recorded during execution** as `CoverageUnit(scanner, account,
+  region, check, status)`, and absence of a unit means nothing was proven.
+- **Coverage no longer cross-multiplies scopes.** Flat `accounts × regions` lists claimed
+  four scopes when two were scanned; units are concrete tuples.
+- **A fully unprotected S3 bucket is visible under `profile: cis` again.** The strict BPA
+  check skipped buckets with no protection at either level, deferring to
+  `CLOUD-S3-NO-BPA` — which the same release had unmapped from CIS. Individually
+  reasonable, jointly a blind spot over the worst possible bucket. The compliance rule
+  now stands on its own, and an end-to-end profile test covers the composed pipeline
+  rather than each check in isolation.
+- **`ListBuckets` is paginated.** AWS rejects unpaginated calls for accounts above the
+  10,000-bucket quota.
+- **IAM.1 now excludes permissions boundary policies**, matching the control's
+  `excludePermissionBoundaryPolicy: true`. The last known deviation in that mapping.
+
+### Added
+- **Per-scope coverage granularity.** One account failing to assume no longer prevents
+  every other account's findings from being confirmed as resolved; one failed check
+  marks only its own scope unknown.
+- **`--fail-on <severity>` and `--fail-on-incomplete`** with distinct exit codes (2 and
+  3), so CI can tell "we found problems" from "we could not look". Both are opt-in.
+- **Scan health in every format.** HTML leads with a coverage banner; SARIF records
+  `invocations[].executionSuccessful` plus `toolExecutionNotifications`, so a consumer
+  seeing zero results can distinguish clean from broken.
+- **Named dropped scopes** in `sentinel diff` warnings — which account or region stopped
+  being scanned, not just how many findings went unassessed.
+- **One shared S3 inventory per account.** Five checks each re-enumerated every bucket
+  and account-level BPA was fetched twice.
+- **Rule `revision` and build provenance.** The ruleset digest now covers detection logic,
+  not just metadata — previously, tightening a check left the digest unchanged and a diff
+  blamed the estate. Reports carry `build_commit` (from git or `SENTINEL_BUILD_COMMIT`),
+  and the package is no longer pinned at 0.1.0.
+
+### Changed
+- **Report `schema_version` is now 2.0.** `coverage.scanners/accounts/regions` are
+  replaced by `coverage.units`. Reports written by 0.1.x are still readable; the diff
+  treats them as unable to confirm resolution.
+
 ### Added
 - Professional suppressions: accept risks by rule/resource with a reason and optional expiry;
   suppressed findings are kept in reports (SARIF `suppressions`, HTML/dashboard markers) and
@@ -134,5 +183,6 @@ All notable changes to this project are documented here. The format is based on
 - Next.js + Tailwind dashboard: severity summary, filtering, drag-and-drop upload, asset display.
 - CI (pytest + ruff + dashboard eslint/build), CodeQL, and Dependabot.
 
-[Unreleased]: https://github.com/citizen204/sentinel-toolkit/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/citizen204/sentinel-toolkit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/citizen204/sentinel-toolkit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/citizen204/sentinel-toolkit/releases/tag/v0.1.0

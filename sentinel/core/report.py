@@ -7,7 +7,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from .envelope import ReportEnvelope
+from .envelope import CoverageStatus, ReportEnvelope
 from .finding import Finding, Severity, Status
 
 _SEVERITY_ORDER = [
@@ -51,6 +51,7 @@ def build_payload(
         "schema_version": envelope.schema_version,
         "run_id": envelope.run_id,
         "tool_version": envelope.tool_version,
+        "build_commit": envelope.build_commit,
         "generated_at": when.isoformat(),
         "ruleset_digest": envelope.ruleset_digest,
         "config_digest": envelope.config_digest,
@@ -73,7 +74,41 @@ def write_json(
     return path
 
 
-def write_html(findings: list[Finding], output_dir: str | Path) -> Path:
+def coverage_summary(envelope: ReportEnvelope) -> dict:
+    """Scan health in the shape a human-facing report needs.
+
+    Every output format shows this. A reader of the HTML report should not have
+    to open the JSON to discover that half the estate was never scanned.
+    """
+    statuses = envelope.coverage.scanner_statuses()
+    incomplete = sorted(
+        name for name, status in statuses.items() if status is not CoverageStatus.OK
+    )
+    scopes = sorted(
+        {
+            "/".join(p for p in (u.account_id, u.region) if p)
+            for u in envelope.coverage.units
+            if u.status is CoverageStatus.OK and (u.account_id or u.region)
+        }
+    )
+    return {
+        "run_id": envelope.run_id,
+        "tool_version": envelope.tool_version,
+        "build_commit": envelope.build_commit,
+        "ruleset_digest": envelope.ruleset_digest,
+        "config_digest": envelope.config_digest,
+        "scanners": {name: status.value for name, status in sorted(statuses.items())},
+        "incomplete": incomplete,
+        "complete": not incomplete and bool(envelope.coverage.units),
+        "scopes": scopes,
+    }
+
+
+def write_html(
+    findings: list[Finding],
+    output_dir: str | Path,
+    envelope: ReportEnvelope | None = None,
+) -> Path:
     when = datetime.now(timezone.utc)
     path = _timestamped_path(output_dir, "html", when)
     env = Environment(
@@ -86,6 +121,7 @@ def write_html(findings: list[Finding], output_dir: str | Path) -> Path:
         summary=summarize(findings),
         suppressed=count_suppressed(findings),
         findings=findings,
+        coverage=coverage_summary(envelope or ReportEnvelope()),
     )
     path.write_text(html, encoding="utf-8")
     return path
@@ -132,7 +168,11 @@ def _sarif_rules(findings: list[Finding]):
     return [rules[i] for i in order], {i: idx for idx, i in enumerate(order)}
 
 
-def write_sarif(findings: list[Finding], output_dir: str | Path) -> Path:
+def write_sarif(
+    findings: list[Finding],
+    output_dir: str | Path,
+    envelope: ReportEnvelope | None = None,
+) -> Path:
     """Write findings as a SARIF 2.1.0 report."""
     when = datetime.now(timezone.utc)
     path = _timestamped_path(output_dir, "sarif", when)
@@ -167,6 +207,43 @@ def write_sarif(findings: list[Finding], output_dir: str | Path) -> Path:
             ]
         results.append(result)
 
+    envelope = envelope or ReportEnvelope()
+    health = coverage_summary(envelope)
+
+    # SARIF models scan health in `invocations`, not in results: a consumer that
+    # sees zero results should be able to tell a clean run from one that could
+    # not execute. executionSuccessful is false when any scanner did not finish.
+    notifications = [
+        {
+            "level": "error" if status != "skipped" else "warning",
+            "message": {
+                "text": (
+                    f"Scanner '{name}' did not run to completion (status: {status}). "
+                    f"Its scope is unassessed, not clean."
+                )
+            },
+            "descriptor": {"id": f"coverage/{status}"},
+            "properties": {"scanner": name, "status": status},
+        }
+        for name, status in health["scanners"].items()
+        if status != "ok"
+    ]
+
+    invocation = {
+        "executionSuccessful": health["complete"],
+        "startTimeUtc": envelope.generated_at,
+        "endTimeUtc": when.isoformat(),
+        "properties": {
+            "runId": health["run_id"],
+            "rulesetDigest": health["ruleset_digest"],
+            "configDigest": health["config_digest"],
+            "scannerStatus": health["scanners"],
+            "coveredScopes": health["scopes"],
+        },
+    }
+    if notifications:
+        invocation["toolExecutionNotifications"] = notifications
+
     doc = {
         "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
         "version": "2.1.0",
@@ -175,10 +252,13 @@ def write_sarif(findings: list[Finding], output_dir: str | Path) -> Path:
                 "tool": {
                     "driver": {
                         "name": "Sentinel",
+                        "version": envelope.tool_version,
                         "informationUri": "https://github.com/citizen204/sentinel-toolkit",
                         "rules": rules,
                     }
                 },
+                "invocations": [invocation],
+                "automationDetails": {"id": f"sentinel/{health['run_id']}"},
                 "results": results,
             }
         ],

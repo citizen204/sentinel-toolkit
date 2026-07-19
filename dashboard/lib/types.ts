@@ -35,10 +35,16 @@ export interface Finding {
 
 export type CoverageStatus = "ok" | "error" | "skipped";
 
+export interface CoverageUnit {
+  scanner: string;
+  account_id?: string | null;
+  region?: string | null;
+  check?: string | null;
+  status: CoverageStatus;
+}
+
 export interface ScanCoverage {
-  scanners: Record<string, CoverageStatus>;
-  accounts: string[];
-  regions: string[];
+  units: CoverageUnit[];
   rules: string[];
 }
 
