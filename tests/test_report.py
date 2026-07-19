@@ -168,3 +168,89 @@ def test_write_sarif_has_stable_fingerprints(sample_findings, tmp_path):
     assert all(fps1)                 # every result carries a fingerprint
     assert fps1 == fps2              # stable across runs of the same findings
     assert len(set(fps1)) == len(fps1)  # distinct findings → distinct fingerprints
+
+
+# --- scan health must appear in every format ---------------------------------
+
+def _incomplete_envelope():
+    from sentinel.core.envelope import (
+        CoverageStatus,
+        CoverageUnit,
+        ReportEnvelope,
+        ScanCoverage,
+    )
+    return ReportEnvelope(
+        ruleset_digest="rrrr", config_digest="cccc",
+        coverage=ScanCoverage(units=[
+            CoverageUnit(scanner="cloudscan", account_id="123456789012",
+                         region="us-east-1", check="s3", status=CoverageStatus.OK),
+            CoverageUnit(scanner="webscan", status=CoverageStatus.SKIPPED),
+        ]),
+    )
+
+
+def test_html_reports_incomplete_coverage(tmp_path):
+    """A reader of the HTML must not have to open the JSON to learn what was missed."""
+    from sentinel.core.report import write_html
+
+    html = write_html([], tmp_path, _incomplete_envelope()).read_text(encoding="utf-8")
+
+    assert "not a clean bill of health" in html
+    assert "webscan" in html and "skipped" in html
+    assert "rrrr" in html and "cccc" in html
+
+
+def test_html_reports_complete_coverage(tmp_path):
+    from sentinel.core.envelope import (
+        CoverageStatus,
+        CoverageUnit,
+        ReportEnvelope,
+        ScanCoverage,
+    )
+    from sentinel.core.report import write_html
+
+    envelope = ReportEnvelope(coverage=ScanCoverage(units=[
+        CoverageUnit(scanner="webscan", status=CoverageStatus.OK)
+    ]))
+    html = write_html([], tmp_path, envelope).read_text(encoding="utf-8")
+
+    assert "Coverage complete" in html
+
+
+def test_sarif_records_scan_health_in_invocations(tmp_path):
+    """SARIF consumers read invocations, not results, to tell clean from broken."""
+    import json
+
+    from sentinel.core.report import write_sarif
+
+    doc = json.loads(
+        write_sarif([], tmp_path, _incomplete_envelope()).read_text(encoding="utf-8")
+    )
+    invocation = doc["runs"][0]["invocations"][0]
+
+    assert invocation["executionSuccessful"] is False
+    notes = invocation["toolExecutionNotifications"]
+    assert any("webscan" in n["message"]["text"] for n in notes)
+    assert invocation["properties"]["scannerStatus"]["webscan"] == "skipped"
+    assert invocation["properties"]["coveredScopes"] == ["123456789012/us-east-1"]
+
+
+def test_sarif_marks_a_complete_run_successful(tmp_path):
+    import json
+
+    from sentinel.core.envelope import (
+        CoverageStatus,
+        CoverageUnit,
+        ReportEnvelope,
+        ScanCoverage,
+    )
+    from sentinel.core.report import write_sarif
+
+    envelope = ReportEnvelope(coverage=ScanCoverage(units=[
+        CoverageUnit(scanner="webscan", status=CoverageStatus.OK)
+    ]))
+    doc = json.loads(
+        write_sarif([], tmp_path, envelope).read_text(encoding="utf-8")
+    )
+
+    assert doc["runs"][0]["invocations"][0]["executionSuccessful"] is True

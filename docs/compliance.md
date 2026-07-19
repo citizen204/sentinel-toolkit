@@ -77,8 +77,8 @@ Even where a mapping holds, the implementation isn't identical to Security Hub's
 
 | Rule | Deviation |
 |---|---|
-| `CLOUD-IAM-CUSTOM-POLICY-ADMIN` | IAM.1 sets `excludePermissionBoundaryPolicy: true`. Sentinel does not yet detect which policies are in use as permission boundaries, so a boundary policy granting `*`/`*` would be reported where Security Hub would exclude it. |
-| `CLOUD-IAM-EFFECTIVE-ADMIN` | Policy `Condition` blocks, permission boundaries, and SCPs are not evaluated, so a constrained grant is still reported. The rule is titled "potential unrestricted admin grant" for that reason. |
+| `CLOUD-IAM-CUSTOM-POLICY-ADMIN` | None known. Policies in use as permissions boundaries are excluded via `ListEntitiesForPolicy(PolicyUsageFilter=PermissionsBoundary)`, matching the control's `excludePermissionBoundaryPolicy: true`. *(moto does not implement `put_user_permissions_boundary`, so this behaviour is guarded by a stub-based test rather than a moto one.)* |
+| `CLOUD-IAM-EFFECTIVE-ADMIN` | Policy `Condition` blocks, permission boundaries, and SCPs are not evaluated, so a constrained grant is still reported. This rule carries **no** compliance mapping, and is titled "potential unrestricted admin grant" for that reason. |
 
 ## Known gaps in benchmark coverage
 

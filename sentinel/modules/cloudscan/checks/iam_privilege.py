@@ -140,16 +140,38 @@ def _iter_users(iam):
         yield from page.get("Users", [])
 
 
+def _is_permission_boundary(iam, policy_arn: str) -> bool:
+    """Whether this policy is in use as a permissions boundary anywhere.
+
+    A boundary policy granting ``*``/``*`` grants nothing on its own - it only
+    caps what other policies may allow - which is why IAM.1 sets
+    ``excludePermissionBoundaryPolicy: true``. Reporting it would be a false
+    positive against the control we claim to implement.
+    """
+    for _ in _paginate(
+        iam, "list_entities_for_policy", "PolicyUsers",
+        PolicyArn=policy_arn, PolicyUsageFilter="PermissionsBoundary",
+    ):
+        return True
+    for key in ("PolicyRoles", "PolicyGroups"):
+        for _ in _paginate(
+            iam, "list_entities_for_policy", key,
+            PolicyArn=policy_arn, PolicyUsageFilter="PermissionsBoundary",
+        ):
+            return True
+    return False
+
+
 def check_customer_managed_admin(session, account_id: str | None = None) -> list[Finding]:
     """Flag customer managed policies whose default version grants full admin.
 
-    This mirrors AWS IAM.1 / CIS 1.16 exactly: customer managed policies only
-    (``Scope=Local``), evaluated whether or not anything is attached to them.
+    This mirrors AWS IAM.1 / CIS 1.16: customer managed policies only
+    (``Scope=Local``), evaluated whether or not anything is attached to them, and
+    excluding policies used as permissions boundaries exactly as the control's
+    ``excludePermissionBoundaryPolicy`` parameter does.
+
     ``check_effective_admin`` answers a different question - what a user can
     actually reach - and the two are deliberately not the same rule.
-
-    Known deviation: IAM.1 sets ``excludePermissionBoundaryPolicy: true``, and this
-    check does not yet detect which policies are in use as permission boundaries.
     """
     iam = session.client("iam")
     findings: list[Finding] = []
@@ -160,6 +182,8 @@ def check_customer_managed_admin(session, account_id: str | None = None) -> list
         )
         document = version["PolicyVersion"]["Document"]
         if not is_admin_document(document):
+            continue
+        if _is_permission_boundary(iam, arn):
             continue
         name = policy["PolicyName"]
         findings.append(
@@ -183,7 +207,10 @@ def check_customer_managed_admin(session, account_id: str | None = None) -> list
                     "default_version": policy["DefaultVersionId"],
                     "attachment_count": policy.get("AttachmentCount"),
                 },
-                api="iam:ListPolicies(Scope=Local), iam:GetPolicyVersion",
+                api=(
+                    "iam:ListPolicies(Scope=Local), iam:GetPolicyVersion, "
+                    "iam:ListEntitiesForPolicy(PolicyUsageFilter=PermissionsBoundary)"
+                ),
                 rationale=(
                     f"The default version of '{name}' contains an Allow statement with "
                     f"Action '*' over Resource '*'. Anything this policy is attached to "

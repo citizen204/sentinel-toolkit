@@ -8,8 +8,13 @@ import typer
 from sentinel import modules  # noqa: F401  (imports register future scanners)
 from sentinel.core import report as report_mod
 from sentinel.core.config import load_config
-from sentinel.core.envelope import CoverageStatus, ScanCoverage, build_envelope
-from sentinel.core.finding import Finding, Severity
+from sentinel.core.envelope import (
+    CoverageStatus,
+    CoverageUnit,
+    ScanCoverage,
+    build_envelope,
+)
+from sentinel.core.finding import Finding, Severity, Status
 from sentinel.core.rule import apply_rule_config
 from sentinel.core.scanner import ScannerSkipped, all_scanners
 from sentinel.core.suppression import apply_suppressions
@@ -42,23 +47,25 @@ def run_scanners_with_coverage(scanners, config) -> tuple[list[Finding], ScanCov
         try:
             produced = scanner.run(config)
             findings.extend(produced)
-            # A check that raised leaves its slice of the account unknown. Scope is
-            # tracked per scanner, not per check, so any check error demotes the
-            # whole scanner rather than overstating what was covered.
-            failed_check = any(
-                f.module == name and f.id.endswith("-ERROR") for f in produced
-            )
-            coverage.scanners[name] = (
-                CoverageStatus.ERROR if failed_check else CoverageStatus.OK
-            )
-            coverage.accounts = sorted(
-                set(coverage.accounts) | set(getattr(scanner, "scanned_accounts", []))
-            )
-            coverage.regions = sorted(
-                set(coverage.regions) | set(getattr(scanner, "scanned_regions", []))
-            )
+            units = list(getattr(scanner, "coverage_units", []))
+            if units:
+                coverage.units.extend(units)
+            else:
+                # A scanner with no scope of its own (no accounts or regions to
+                # enumerate) still reports whether it completed.
+                failed = any(
+                    f.module == name and f.id.endswith("-ERROR") for f in produced
+                )
+                coverage.units.append(
+                    CoverageUnit(
+                        scanner=name,
+                        status=CoverageStatus.ERROR if failed else CoverageStatus.OK,
+                    )
+                )
         except ScannerSkipped as skip:
-            coverage.scanners[name] = CoverageStatus.SKIPPED
+            coverage.units.append(
+                CoverageUnit(scanner=name, status=CoverageStatus.SKIPPED)
+            )
             findings.append(
                 Finding(
                     id="SCANNER-SKIPPED",
@@ -79,7 +86,9 @@ def run_scanners_with_coverage(scanners, config) -> tuple[list[Finding], ScanCov
                 )
             )
         except Exception as exc:  # noqa: BLE001 - intentionally isolate any scanner failure
-            coverage.scanners[name] = CoverageStatus.ERROR
+            coverage.units.append(
+                CoverageUnit(scanner=name, status=CoverageStatus.ERROR)
+            )
             findings.append(
                 Finding(
                     id="SCANNER-ERROR",
@@ -97,6 +106,58 @@ def run_scanners_with_coverage(scanners, config) -> tuple[list[Finding], ScanCov
                 )
             )
     return findings, coverage
+
+
+_SEVERITY_RANK = {
+    Severity.INFO: 0, Severity.LOW: 1, Severity.MEDIUM: 2,
+    Severity.HIGH: 3, Severity.CRITICAL: 4,
+}
+
+# Distinct exit codes so a CI job can tell "we found problems" from "we could not
+# look", which are different failures needing different responses.
+EXIT_FINDINGS = 2
+EXIT_INCOMPLETE = 3
+
+
+def _gate(findings, coverage, fail_on, fail_on_incomplete) -> int:
+    """Decide the process exit code. 0 unless a gate was asked for and tripped."""
+    if fail_on_incomplete:
+        not_ok = sorted(
+            name for name, status in coverage.scanner_statuses().items()
+            if status is not CoverageStatus.OK
+        )
+        if not_ok or not coverage.units:
+            detail = ", ".join(not_ok) if not_ok else "nothing was covered"
+            typer.echo(f"Incomplete scan coverage: {detail}.")
+            return EXIT_INCOMPLETE
+
+    if fail_on:
+        threshold = _SEVERITY_RANK[Severity(fail_on)]
+        breaching = [
+            f for f in findings
+            if f.status != Status.SUPPRESSED
+            and _SEVERITY_RANK.get(f.severity, 0) >= threshold
+        ]
+        if breaching:
+            typer.echo(
+                f"{len(breaching)} finding(s) at or above {Severity(fail_on).value}."
+            )
+            return EXIT_FINDINGS
+    return 0
+
+
+def _mark_unrun_as_skipped(coverage) -> None:
+    """Record every registered scanner that this run did not execute.
+
+    Omitting them entirely would leave no evidence either way, and a later diff
+    would then have to guess. An explicit SKIPPED says "not assessed here".
+    """
+    ran = {unit.scanner for unit in coverage.units}
+    for name in all_scanners():
+        if name not in ran:
+            coverage.units.append(
+                CoverageUnit(scanner=name, status=CoverageStatus.SKIPPED)
+            )
 
 
 def _enabled_rule_ids(config) -> list[str]:
@@ -145,9 +206,13 @@ def _emit_reports(findings, output_dir: str, fmt, envelope=None) -> None:
             f"JSON report: {report_mod.write_json(findings, output_dir, envelope)}"
         )
     if fmt in ("html", "both", "all"):
-        typer.echo(f"HTML report: {report_mod.write_html(findings, output_dir)}")
+        typer.echo(
+            f"HTML report: {report_mod.write_html(findings, output_dir, envelope)}"
+        )
     if fmt in ("sarif", "all"):
-        typer.echo(f"SARIF report: {report_mod.write_sarif(findings, output_dir)}")
+        typer.echo(
+            f"SARIF report: {report_mod.write_sarif(findings, output_dir, envelope)}"
+        )
     suppressed = report_mod.count_suppressed(findings)
     total = len(findings)
     note = f" ({suppressed} suppressed)" if suppressed else ""
@@ -247,6 +312,14 @@ def scan_all(
     exclude: str = typer.Option(
         None, "--exclude", help="Skip these scanners (comma-separated), e.g. cloudscan."
     ),
+    fail_on: Severity = typer.Option(
+        None, "--fail-on",
+        help="Exit non-zero if any open finding is at or above this severity.",
+    ),
+    fail_on_incomplete: bool = typer.Option(
+        False, "--fail-on-incomplete",
+        help="Exit non-zero if any scanner did not run to completion.",
+    ),
 ) -> None:
     """Run every registered scanner and write a consolidated report.
 
@@ -265,12 +338,14 @@ def scan_all(
     findings = apply_suppressions(findings, cfg.suppressions)
     # Scanners excluded from this run are recorded as skipped rather than omitted,
     # so a later diff won't read their absent findings as fixed.
-    for name in all_scanners():
-        coverage.scanners.setdefault(name, CoverageStatus.SKIPPED)
+    _mark_unrun_as_skipped(coverage)
     coverage.rules = _enabled_rule_ids(cfg)
     _emit_reports(
         findings, output_dir or cfg.output_dir, fmt, build_envelope(cfg, coverage)
     )
+    code = _gate(findings, coverage, fail_on, fail_on_incomplete)
+    if code:
+        raise typer.Exit(code=code)
 
 
 @app.command("scan")
@@ -295,8 +370,7 @@ def scan(
     findings = apply_rule_config(findings, cfg)
     findings = filter_ignored(findings, cfg.ignore_ids)
     findings = apply_suppressions(findings, cfg.suppressions)
-    for other in all_scanners():
-        coverage.scanners.setdefault(other, CoverageStatus.SKIPPED)
+    _mark_unrun_as_skipped(coverage)
     coverage.rules = _enabled_rule_ids(cfg)
     _emit_reports(
         findings, output_dir or cfg.output_dir, fmt, build_envelope(cfg, coverage)

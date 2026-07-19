@@ -3,6 +3,7 @@ from __future__ import annotations
 import boto3
 
 from sentinel.core.context import aws_scan_context, discover_regions
+from sentinel.core.envelope import CoverageStatus, CoverageUnit
 from sentinel.core.finding import Finding
 from sentinel.core.rule import build_finding
 from sentinel.core.scanner import BaseScanner
@@ -12,6 +13,7 @@ from .checks.iam import check_password_policy, check_users_without_mfa
 from .checks.iam_privilege import check_customer_managed_admin, check_effective_admin
 from .checks.rds import check_unencrypted_databases
 from .checks.s3 import (
+    S3Inventory,
     check_bucket_encryption,
     check_bucket_public_access_block,
     check_bucket_public_access_block_strict,
@@ -41,31 +43,44 @@ def _check_error(name: str, exc: Exception) -> list[Finding]:
     ]
 
 
-def _run_check(name: str, fn) -> list[Finding]:
+def _run_check(name: str, fn) -> tuple[list[Finding], bool]:
     """Run one cloudscan check, isolating its failure as an INFO finding.
 
     Keeps the findings other checks already produced instead of letting a single
     failing API call (e.g. a missing IAM permission) wipe out the whole module.
+    Returns the findings and whether the check completed.
     """
     try:
-        return fn()
+        return fn(), True
     except Exception as exc:  # noqa: BLE001 - isolate any single check failure
-        return _check_error(name, exc)
+        return _check_error(name, exc), False
 
 
-def _scan_session(session, regions: list[str]) -> list[Finding]:
-    """Run every cloudscan check against one account's session."""
+# Checks whose scope is the whole account; their findings carry no region.
+_GLOBAL_CHECKS = "global"
+
+
+def _scan_session(session, regions: list[str]) -> tuple[list[Finding], list[CoverageUnit]]:
+    """Run every cloudscan check against one account's session.
+
+    Returns the findings plus a coverage unit per (check, account, region) that
+    was genuinely attempted -- recorded here, where the scope is known, rather
+    than reconstructed later from whatever findings happened to appear.
+    """
     findings: list[Finding] = []
+    units: list[CoverageUnit] = []
 
     # Resolve the scan scope. An explicit list wins; otherwise discover the
     # account's enabled regions so an unconfigured scan really does cover
     # every region rather than just the session default.
+    discovery_failed = False
     if not regions:
         try:
             regions = discover_regions(session)
         except Exception as exc:  # noqa: BLE001
             findings += _check_error("region_discovery", exc)
             regions = [session.region_name] if session.region_name else []
+            discovery_failed = True
 
     # Establish identity next: it attributes every asset to an account and
     # keeps dedupe keys stable across accounts. If it fails, say so rather
@@ -80,49 +95,66 @@ def _scan_session(session, regions: list[str]) -> list[Finding]:
     # the session having a default configured.
     primary_region = regions[0] if regions else None
 
-    findings += _run_check(
-        "s3_public_buckets", lambda: check_public_buckets(session, account)
-    )
-    findings += _run_check(
-        "s3_encryption", lambda: check_bucket_encryption(session, account)
-    )
-    findings += _run_check(
-        "s3_versioning", lambda: check_bucket_versioning(session, account)
-    )
-    findings += _run_check(
-        "s3_block_public_access",
-        lambda: check_bucket_public_access_block(session, account, primary_region),
-    )
-    findings += _run_check(
-        "s3_block_public_access_strict",
-        lambda: check_bucket_public_access_block_strict(
-            session, account, primary_region
-        ),
-    )
-    findings += _run_check(
-        "open_security_groups",
-        lambda: check_open_security_groups(session, regions, account),
-    )
-    findings += _run_check(
-        "iam_users_without_mfa", lambda: check_users_without_mfa(session, account)
-    )
-    findings += _run_check(
-        "iam_password_policy", lambda: check_password_policy(session, account)
-    )
-    findings += _run_check(
-        "iam_effective_admin", lambda: check_effective_admin(session, account)
-    )
-    findings += _run_check(
-        "iam_customer_managed_admin",
-        lambda: check_customer_managed_admin(session, account),
-    )
-    findings += _run_check(
-        "ebs_encryption", lambda: check_unencrypted_volumes(session, regions, account)
-    )
-    findings += _run_check(
-        "rds_encryption", lambda: check_unencrypted_databases(session, regions, account)
-    )
-    return findings
+    def record(name: str, fn, scope: str | list[str]) -> None:
+        """Run a check and record coverage for every scope it was meant to reach.
+
+        `scope` is either _GLOBAL_CHECKS (account-wide, no region) or the list of
+        regions the check iterates. A check that raised marks its scopes ERROR,
+        so a permission gap in one region cannot make another region's old
+        findings look resolved.
+        """
+        produced, ok = _run_check(name, fn)
+        findings.extend(produced)
+        status = CoverageStatus.OK if ok else CoverageStatus.ERROR
+        # Region discovery failing means we do not know the real region list, so
+        # regional checks cannot claim to have covered it.
+        if scope != _GLOBAL_CHECKS and discovery_failed:
+            status = CoverageStatus.ERROR
+        scopes = [None] if scope == _GLOBAL_CHECKS else list(scope) or [None]
+        for region in scopes:
+            units.append(
+                CoverageUnit(
+                    scanner="cloudscan", account_id=account,
+                    region=region, check=name, status=status,
+                )
+            )
+
+    # One bucket enumeration and one account-BPA lookup, shared by all five S3
+    # checks. Each of them used to re-list every bucket in the account.
+    s3_inventory = S3Inventory(session, primary_region)
+
+    record("s3_public_buckets",
+           lambda: check_public_buckets(session, account, s3_inventory),
+           _GLOBAL_CHECKS)
+    record("s3_encryption",
+           lambda: check_bucket_encryption(session, account, s3_inventory),
+           _GLOBAL_CHECKS)
+    record("s3_versioning",
+           lambda: check_bucket_versioning(session, account, s3_inventory),
+           _GLOBAL_CHECKS)
+    record("s3_block_public_access",
+           lambda: check_bucket_public_access_block(
+               session, account, primary_region, s3_inventory),
+           _GLOBAL_CHECKS)
+    record("s3_block_public_access_strict",
+           lambda: check_bucket_public_access_block_strict(
+               session, account, primary_region, s3_inventory),
+           _GLOBAL_CHECKS)
+    record("iam_users_without_mfa",
+           lambda: check_users_without_mfa(session, account), _GLOBAL_CHECKS)
+    record("iam_password_policy",
+           lambda: check_password_policy(session, account), _GLOBAL_CHECKS)
+    record("iam_effective_admin",
+           lambda: check_effective_admin(session, account), _GLOBAL_CHECKS)
+    record("iam_customer_managed_admin",
+           lambda: check_customer_managed_admin(session, account), _GLOBAL_CHECKS)
+    record("open_security_groups",
+           lambda: check_open_security_groups(session, regions, account), regions)
+    record("ebs_encryption",
+           lambda: check_unencrypted_volumes(session, regions, account), regions)
+    record("rds_encryption",
+           lambda: check_unencrypted_databases(session, regions, account), regions)
+    return findings, units
 
 
 class CloudScanner(BaseScanner):
@@ -143,30 +175,24 @@ class CloudScanner(BaseScanner):
         )
 
         if not config.aws_accounts:
-            return self._record(_scan_session(base, config.aws_regions))
+            findings, self.coverage_units = _scan_session(base, config.aws_regions)
+            return findings
 
         findings: list[Finding] = []
+        units: list[CoverageUnit] = []
         for account in config.aws_accounts:
             try:
                 session = assume_role_session(base, account.role_arn)
             except Exception as exc:  # noqa: BLE001 - isolate one bad account
-                # Deliberately not recorded as scanned: an account we could not
-                # assume into must never make its old findings look resolved.
+                # No coverage unit is recorded for an account we could not assume
+                # into, so its previous findings stay unassessed rather than
+                # appearing to have been fixed. The other accounts still scan.
                 findings += _check_error(f"assume_role[{account.role_arn}]", exc)
                 continue
-            findings += _scan_session(session, account.regions or config.aws_regions)
-        return self._record(findings)
-
-    def _record(self, findings: list[Finding]) -> list[Finding]:
-        """Note which accounts and regions this run actually reached.
-
-        Derived from the assets that came back, so it reflects what was really
-        enumerated rather than what was requested.
-        """
-        self.scanned_accounts = sorted(
-            {f.asset.account_id for f in findings if f.asset and f.asset.account_id}
-        )
-        self.scanned_regions = sorted(
-            {f.asset.region for f in findings if f.asset and f.asset.region}
-        )
+            produced, produced_units = _scan_session(
+                session, account.regions or config.aws_regions
+            )
+            findings += produced
+            units += produced_units
+        self.coverage_units = units
         return findings

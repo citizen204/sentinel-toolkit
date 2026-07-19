@@ -25,7 +25,50 @@ def _bucket_asset(name: str, account_id: str | None = None) -> Asset:
 
 
 def _bucket_names(s3) -> list[str]:
-    return [b["Name"] for b in s3.list_buckets().get("Buckets", [])]
+    """Every bucket in the account, paginated.
+
+    AWS rejects unpaginated ListBuckets for accounts whose bucket quota exceeds
+    10,000, so a single call is both incomplete and, past that threshold, an error.
+    """
+    return [
+        b["Name"]
+        for page in s3.get_paginator("list_buckets").paginate()
+        for b in page.get("Buckets", [])
+    ]
+
+
+class S3Inventory:
+    """One enumeration of the account's S3 state, shared by every S3 check.
+
+    Five checks each calling ListBuckets means five full enumerations of an
+    account that may hold thousands of buckets, and the account-level Block
+    Public Access configuration was being fetched twice. Both are collected once
+    here and handed to the checks.
+    """
+
+    def __init__(self, session, region: str | None = None) -> None:
+        self.session = session
+        self.s3 = session.client("s3")
+        self.region = region
+        self._names: list[str] | None = None
+        self._account_bpa: tuple[bool, str] | None = None
+
+    @property
+    def names(self) -> list[str]:
+        if self._names is None:
+            self._names = _bucket_names(self.s3)
+        return self._names
+
+    @property
+    def account_bpa(self) -> tuple[bool, str]:
+        if self._account_bpa is None:
+            self._account_bpa = _account_bpa_fully_blocked(self.session, self.region)
+        return self._account_bpa
+
+
+def _inventory(session, inventory, region=None) -> S3Inventory:
+    """Use the shared inventory when given one; otherwise build a private one."""
+    return inventory if inventory is not None else S3Inventory(session, region)
 
 
 def _public_grant_uris(grants: list[dict]) -> list[str]:
@@ -37,11 +80,14 @@ def _public_grant_uris(grants: list[dict]) -> list[str]:
     ]
 
 
-def check_public_buckets(session, account_id: str | None = None) -> list[Finding]:
+def check_public_buckets(
+    session, account_id: str | None = None, inventory: S3Inventory | None = None
+) -> list[Finding]:
     """Flag S3 buckets whose ACL grants access to a public group."""
-    s3 = session.client("s3")
+    inv = _inventory(session, inventory)
+    s3 = inv.s3
     findings: list[Finding] = []
-    for name in _bucket_names(s3):
+    for name in inv.names:
         grants = s3.get_bucket_acl(Bucket=name).get("Grants", [])
         public_uris = _public_grant_uris(grants)
         if public_uris:
@@ -71,11 +117,14 @@ def check_public_buckets(session, account_id: str | None = None) -> list[Finding
     return findings
 
 
-def check_bucket_encryption(session, account_id: str | None = None) -> list[Finding]:
+def check_bucket_encryption(
+    session, account_id: str | None = None, inventory: S3Inventory | None = None
+) -> list[Finding]:
     """Flag S3 buckets without default server-side encryption."""
-    s3 = session.client("s3")
+    inv = _inventory(session, inventory)
+    s3 = inv.s3
     findings: list[Finding] = []
-    for name in _bucket_names(s3):
+    for name in inv.names:
         try:
             s3.get_bucket_encryption(Bucket=name)
         except ClientError as exc:
@@ -107,11 +156,14 @@ def check_bucket_encryption(session, account_id: str | None = None) -> list[Find
     return findings
 
 
-def check_bucket_versioning(session, account_id: str | None = None) -> list[Finding]:
+def check_bucket_versioning(
+    session, account_id: str | None = None, inventory: S3Inventory | None = None
+) -> list[Finding]:
     """Flag S3 buckets that do not have versioning enabled."""
-    s3 = session.client("s3")
+    inv = _inventory(session, inventory)
+    s3 = inv.s3
     findings: list[Finding] = []
-    for name in _bucket_names(s3):
+    for name in inv.names:
         status = s3.get_bucket_versioning(Bucket=name).get("Status")
         if status != "Enabled":
             findings.append(
@@ -164,17 +216,19 @@ def _bucket_bpa_fully_blocked(s3, name: str) -> bool:
 
 
 def check_bucket_public_access_block(
-    session, account_id: str | None = None, region: str | None = None
+    session, account_id: str | None = None, region: str | None = None,
+    inventory: S3Inventory | None = None,
 ) -> list[Finding]:
     """Flag buckets not covered by Block Public Access at bucket *or* account level.
 
     Account-level BPA protects every bucket, so checking only the bucket-level
     setting would report false positives on accounts that block centrally.
     """
-    s3 = session.client("s3")
-    account_blocked, bpa_region = _account_bpa_fully_blocked(session, region)
+    inv = _inventory(session, inventory, region)
+    s3 = inv.s3
+    account_blocked, bpa_region = inv.account_bpa
     findings: list[Finding] = []
-    for name in _bucket_names(s3):
+    for name in inv.names:
         bucket_blocked = _bucket_bpa_fully_blocked(s3, name)
         effective = bucket_blocked or account_blocked
         if effective:
@@ -214,32 +268,42 @@ def check_bucket_public_access_block(
 
 
 def check_bucket_public_access_block_strict(
-    session, account_id: str | None = None, region: str | None = None
+    session, account_id: str | None = None, region: str | None = None,
+    inventory: S3Inventory | None = None,
 ) -> list[Finding]:
-    """Flag buckets where BPA is set at only one of the two levels.
+    """Flag every bucket that fails CIS 2.1.4: both levels must be set.
 
     CIS 2.1.4 maps to two Security Hub controls - S3.1 (account) and S3.8 (bucket) -
     and both must pass. `check_bucket_public_access_block` answers the risk question
     (is this bucket protected *at all*); this answers the compliance question, and
     conflating the two would let Sentinel claim CIS coverage it hasn't established.
+
+    This deliberately overlaps with CLOUD-S3-NO-BPA on fully unprotected buckets.
+    An earlier version skipped them "because the risk rule already reports it" -- but
+    that rule carries no CIS mapping, so under `profile: cis` the worst possible
+    bucket produced no finding at all. A compliance rule has to stand on its own.
     """
-    s3 = session.client("s3")
-    account_blocked, bpa_region = _account_bpa_fully_blocked(session, region)
+    inv = _inventory(session, inventory, region)
+    s3 = inv.s3
+    account_blocked, bpa_region = inv.account_bpa
     findings: list[Finding] = []
-    for name in _bucket_names(s3):
+    for name in inv.names:
         bucket_blocked = _bucket_bpa_fully_blocked(s3, name)
         if bucket_blocked and account_blocked:
             continue
-        # Fully unprotected buckets are already reported by CLOUD-S3-NO-BPA.
         if not bucket_blocked and not account_blocked:
-            continue
-        missing = "bucket" if account_blocked else "account"
+            missing = "account and bucket"
+            level_note = "at neither the account nor the bucket level"
+        else:
+            missing = "bucket" if account_blocked else "account"
+            level_note = (
+                f"at the {'account' if account_blocked else 'bucket'} level only"
+            )
         findings.append(
             build_finding(
                 "CLOUD-S3-BPA-NOT-STRICT",
                 description=(
-                    f"S3 bucket '{name}' has Block Public Access at the "
-                    f"{'account' if account_blocked else 'bucket'} level only; "
+                    f"S3 bucket '{name}' has Block Public Access {level_note}; "
                     f"CIS 2.1.4 requires both levels."
                 ),
                 remediation=(
@@ -258,10 +322,16 @@ def check_bucket_public_access_block_strict(
                 api="s3:GetPublicAccessBlock + s3:GetAccountPublicAccessBlock",
                 rationale=(
                     f"Bucket-level fully blocked = {bucket_blocked}, account-level = "
-                    f"{account_blocked}. The bucket is not publicly exposed right now, "
-                    f"but CIS 2.1.4 is satisfied only when both S3.1 (account) and S3.8 "
-                    f"(bucket) pass, so a single change to the {'account' if account_blocked else 'bucket'} "
-                    f"setting would expose it."
+                    f"{account_blocked}. CIS 2.1.4 is satisfied only when both S3.1 "
+                    f"(account) and S3.8 (bucket) pass."
+                    + (
+                        " Nothing currently prevents a public ACL or policy on this "
+                        "bucket."
+                        if not bucket_blocked and not account_blocked
+                        else f" The bucket is not exposed today, but one change to the "
+                             f"{'account' if account_blocked else 'bucket'} setting "
+                             f"would expose it."
+                    )
                 ),
                 verify=f"aws s3api get-public-access-block --bucket {name}",
                 resource=name,
