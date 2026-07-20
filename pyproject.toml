@@ -5,7 +5,7 @@ description = "Sentinel — a modular defensive security toolkit"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.6",
-    "typer>=0.12",
+    "typer>=0.27.0",
     "jinja2>=3.1",
     "pyyaml>=6.0",
     "boto3>=1.34",
