@@ -21,7 +21,7 @@ from .checks.s3 import (
     check_public_buckets,
 )
 from .checks.security_groups import check_open_security_groups
-from .session import assume_role_session
+from .session import account_id_from_arn, assume_role_session
 
 
 def _check_error(name: str, exc: Exception) -> list[Finding]:
@@ -86,10 +86,12 @@ def _scan_session(session, regions: list[str]) -> tuple[list[Finding], list[Cove
     # keeps dedupe keys stable across accounts. If it fails, say so rather
     # than silently scanning without an account id.
     context = None
+    identity_failed = False
     try:
         context = aws_scan_context(session, regions)
     except Exception as exc:  # noqa: BLE001
         findings += _check_error("scan_context", exc)
+        identity_failed = True
     account = context.account_id if context else None
     # s3control is regional; give it a concrete region instead of relying on
     # the session having a default configured.
@@ -106,6 +108,11 @@ def _scan_session(session, regions: list[str]) -> tuple[list[Finding], list[Cove
         produced, ok = _run_check(name, fn)
         findings.extend(produced)
         status = CoverageStatus.OK if ok else CoverageStatus.ERROR
+        # Without an account id, findings cannot be attributed and their dedupe
+        # keys are not comparable with a run that did resolve identity. Nothing
+        # from this session may be treated as authoritative.
+        if identity_failed:
+            status = CoverageStatus.ERROR
         # Region discovery failing means we do not know the real region list, so
         # regional checks cannot claim to have covered it.
         if scope != _GLOBAL_CHECKS and discovery_failed:
@@ -184,10 +191,21 @@ class CloudScanner(BaseScanner):
             try:
                 session = assume_role_session(base, account.role_arn)
             except Exception as exc:  # noqa: BLE001 - isolate one bad account
-                # No coverage unit is recorded for an account we could not assume
-                # into, so its previous findings stay unassessed rather than
-                # appearing to have been fixed. The other accounts still scan.
+                # An explicit ERROR unit, not just a finding. Omitting the account
+                # entirely leaves no trace that it was meant to be in scope, so the
+                # run still looks complete and --fail-on-incomplete passes on an
+                # estate that was only partly reachable. Other accounts still scan.
                 findings += _check_error(f"assume_role[{account.role_arn}]", exc)
+                units.append(
+                    CoverageUnit(
+                        scanner="cloudscan",
+                        account_id=account.account_id or account_id_from_arn(
+                            account.role_arn
+                        ),
+                        check="assume_role",
+                        status=CoverageStatus.ERROR,
+                    )
+                )
                 continue
             produced, produced_units = _scan_session(
                 session, account.regions or config.aws_regions

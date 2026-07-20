@@ -6,6 +6,48 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-07-20
+
+0.2.0 shipped a coverage model that was supposed to make "resolved" mean something.
+Review found four ways it still did not. No new rules in this release.
+
+### Fixed
+- **0.1.x reports can actually be read.** `diff` validated 1.x coverage against the 2.0
+  model and raised, on every one of them, while the 0.2.0 changelog claimed they were
+  readable. They are now read and explicitly distrusted: comparison proceeds, warnings
+  explain why, and nothing in a cross-schema comparison is reported as resolved —
+  `dedupe_key` derives partly from a rule's title, 0.2.0 renamed rules, and "gone" is
+  therefore indistinguishable from "renamed". A real 1.x report now lives in
+  `tests/fixtures/` so this is tested rather than claimed.
+- **Three ways a broken scan reported itself as complete.** A failed `sts:GetCallerIdentity`,
+  a failed region discovery, and an account that could not be assumed into all produced
+  findings but no `ERROR` coverage, so `--fail-on-incomplete` exited 0. Each now records an
+  explicit error scope; the unreachable account is attributed by parsing its role ARN, since
+  STS never answered to supply the id.
+- **The completeness gate judged scanners nobody asked to run.** `--include webscan
+  --fail-on-incomplete` exited 3 even when webscan succeeded, because excluded scanners were
+  marked skipped and the gate checked every registered scanner. Excluded scanners are still
+  recorded in the report — a later diff needs to know they were not assessed — but the gate
+  now judges only the selection.
+- **The documented IAM policy no longer lags the code.** It was missing
+  `iam:ListEntitiesForPolicy`, added in 0.2.0 for the permissions-boundary exclusion, so
+  following the README produced AccessDenied on a real account. Permissions now live in a
+  machine-readable manifest (`cloudscan/permissions.py`) that tests check in both directions:
+  every action the code calls is granted, and every granted action has a caller. The policy
+  is also validated for shape, since an unknown key makes AWS reject the whole document.
+- **`config_digest` includes `aws_profile`.** Two scans of different accounts hashed
+  identically, so a diff across them showed no configuration change.
+
+### Added
+- `sentinel scan <name>` accepts `--fail-on` and `--fail-on-incomplete`, which previously
+  only `scan-all` had.
+
+### Known limitations
+- Coverage granularity is per (scanner, account, region), not per rule. One failing IAM check
+  therefore leaves successful S3 rules in the same account unconfirmable. This is deliberately
+  conservative and will produce persistent `unassessed` entries on large estates; a
+  rule-to-check mapping is planned for 0.3.
+
 ## [0.2.0] - 2026-07-19 — Trust kernel
 
 Everything in this release exists to make one claim defensible: **when Sentinel says
@@ -52,8 +94,12 @@ a finding is resolved, it looked.** Two of the fixes below close holes introduce
 
 ### Changed
 - **Report `schema_version` is now 2.0.** `coverage.scanners/accounts/regions` are
-  replaced by `coverage.units`. Reports written by 0.1.x are still readable; the diff
-  treats them as unable to confirm resolution.
+  replaced by `coverage.units`. ~~Reports written by 0.1.x are still readable; the diff
+  treats them as unable to confirm resolution.~~
+  **Correction (0.2.1): this was not true when written.** `diff` validated 1.x coverage
+  against the 2.0 model and raised a `ValidationError` on every 0.1.x report. The claim was
+  never tested. Fixed in 0.2.1; a 1.x fixture is now in the test suite so the claim is
+  verified rather than asserted.
 
 ### Added
 - Professional suppressions: accept risks by rule/resource with a reason and optional expiry;
@@ -183,6 +229,7 @@ a finding is resolved, it looked.** Two of the fixes below close holes introduce
 - Next.js + Tailwind dashboard: severity summary, filtering, drag-and-drop upload, asset display.
 - CI (pytest + ruff + dashboard eslint/build), CodeQL, and Dependabot.
 
-[Unreleased]: https://github.com/citizen204/sentinel-toolkit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/citizen204/sentinel-toolkit/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/citizen204/sentinel-toolkit/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/citizen204/sentinel-toolkit/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/citizen204/sentinel-toolkit/releases/tag/v0.1.0

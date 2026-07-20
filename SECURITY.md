@@ -8,9 +8,13 @@ not responsible for misuse.
 
 ## Supported versions
 
-| Version | Supported |
-|---------|:---------:|
-| 0.1.x   | ✅        |
+Fixes land on the latest minor only. There is no long-term support branch, and this is a
+single-maintainer project — plan upgrades accordingly.
+
+| Version | Supported | Notes |
+|---------|:---------:|-------|
+| 0.2.x   | ✅        | Current. |
+| 0.1.x   | ❌        | Report schema 1.x. Its coverage model treats an unrecorded scope as unlimited, which can present an unscanned resource as remediated. Upgrade and re-scan to get a trustworthy baseline. |
 
 ## Reporting a vulnerability
 

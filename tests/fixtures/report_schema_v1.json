@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "run_id": "0f6f2a1e-3c4b-4a6d-9f11-2b8c5d7e9a30",
+  "tool_version": "0.1.0",
+  "generated_at": "2026-07-17T11:30:00+00:00",
+  "ruleset_digest": "4f53cda18c2baa0c",
+  "config_digest": "9c1185a5c5e9fc54",
+  "coverage": {
+    "scanners": {"cloudscan": "ok", "webscan": "skipped"},
+    "accounts": ["123456789012"],
+    "regions": ["us-east-1", "ap-southeast-2"],
+    "rules": ["CLOUD-RDS-UNENCRYPTED", "CLOUD-SG-OPEN-INGRESS"]
+  },
+  "summary": {"Critical": 0, "High": 1, "Medium": 0, "Low": 0, "Info": 0},
+  "suppressed": 0,
+  "findings": [
+    {
+      "id": "CLOUD-RDS-UNENCRYPTED",
+      "module": "cloudscan",
+      "severity": "High",
+      "title": "Unencrypted RDS instance",
+      "description": "RDS instance 'legacy-db' does not have storage encryption enabled.",
+      "remediation": "Enable storage encryption.",
+      "category": "Data Protection",
+      "references": [],
+      "compliance": ["CIS-AWS-3.0.0:2.3.1"],
+      "confidence": "High",
+      "status": "open",
+      "asset": {
+        "provider": "aws", "type": "rds_instance", "id": "legacy-db",
+        "name": "legacy-db", "account_id": "123456789012",
+        "region": "ap-southeast-2", "tags": {}
+      },
+      "dedupe_key": "dcc0fd37c31a411f0000000000000000000000000000000000000000000000aa",
+      "evidence": {"db_instance": "legacy-db", "region": "ap-southeast-2"},
+      "resource": "legacy-db",
+      "timestamp": "2026-07-17T11:30:00+00:00"
+    }
+  ]
+}

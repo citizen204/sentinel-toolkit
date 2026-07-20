@@ -178,8 +178,10 @@ def config_digest(config) -> str:
     """Fingerprint the settings that decide what gets scanned and reported."""
     if config is None:
         return ""
-    fields = ("aws_regions", "aws_accounts", "profile", "rules", "ignore_ids",
-              "suppressions", "log_paths", "target_url", "capture_file")
+    # aws_profile decides *which account* gets scanned, so two runs that differ only
+    # by profile are not comparable and must not share a digest.
+    fields = ("aws_profile", "aws_regions", "aws_accounts", "profile", "rules",
+              "ignore_ids", "suppressions", "log_paths", "target_url", "capture_file")
     snapshot = {}
     for name in fields:
         value = getattr(config, name, None)

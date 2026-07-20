@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import Counter
 
+from pydantic import ValidationError
+
 from .envelope import CoverageStatus, ScanCoverage
 
 
@@ -14,12 +16,38 @@ def _by_key(report: dict) -> dict[str, dict]:
     }
 
 
-def _coverage(report: dict) -> ScanCoverage | None:
-    """The run's coverage, or None for a report written before envelopes existed."""
+def is_legacy_coverage(report: dict) -> bool:
+    """True for a schema 1.x report, whose coverage shape this version cannot trust.
+
+    Schema 1.x stored flat ``scanners``/``accounts``/``regions`` lists, and treated
+    an empty list as "unconstrained" -- so a clean run recorded no scope and the
+    diff would retire findings from accounts it never touched. That data cannot be
+    converted into honest coverage units after the fact, because the information it
+    is missing was never collected. It is read, and then deliberately not trusted.
+    """
     raw = report.get("coverage")
-    if raw is None:
+    if not isinstance(raw, dict):
+        return False
+    return "units" not in raw and any(
+        key in raw for key in ("scanners", "accounts", "regions")
+    )
+
+
+def _coverage(report: dict) -> ScanCoverage | None:
+    """The run's coverage, or None when this version cannot rely on it.
+
+    Returns None both for pre-envelope reports and for schema 1.x, rather than
+    raising: refusing to read an old report is a worse failure than reading it and
+    declining to draw conclusions from it.
+    """
+    raw = report.get("coverage")
+    if not isinstance(raw, dict) or is_legacy_coverage(report):
         return None
-    return ScanCoverage.model_validate(raw)
+    try:
+        return ScanCoverage.model_validate(raw)
+    except ValidationError:
+        # An unrecognised future or malformed shape. Same rule: readable, untrusted.
+        return None
 
 
 def _scope_labels(coverage: ScanCoverage) -> set[str]:
@@ -71,7 +99,17 @@ def diff_reports(old_report: dict, new_report: dict) -> dict:
     new_coverage = _coverage(new_report)
 
     warnings: list[str] = []
-    if new_coverage is None or _coverage(old_report) is None:
+    legacy = [
+        label for label, report in (("older", old_report), ("newer", new_report))
+        if is_legacy_coverage(report)
+    ]
+    if legacy:
+        warnings.append(
+            f"The {' and '.join(legacy)} report uses schema 1.x, whose coverage model "
+            f"treated an empty scope as unlimited. It is compared here, but nothing "
+            f"in it can confirm a fix. Re-scan to get a trustworthy baseline."
+        )
+    if (new_coverage is None or _coverage(old_report) is None) and not legacy:
         warnings.append(
             "One or both reports predate coverage tracking, so nothing can be "
             "confirmed as resolved."
@@ -94,13 +132,19 @@ def diff_reports(old_report: dict, new_report: dict) -> dict:
             "or suppressions), so the two runs may not cover the same scope."
         )
 
+    # Across a schema change, a finding's absence is not evidence of anything.
+    # dedupe_key is derived partly from the rule's title, and v0.2.0 renamed rules,
+    # so a 1.x key may simply have no 2.x counterpart to match against. "Gone" and
+    # "renamed" are indistinguishable here, and only one of them is a fix.
+    comparable = not legacy
+
     resolved: list[dict] = []
     unassessed: list[dict] = []
     for key, finding in old.items():
         if key in new:
             continue
         account, region = _asset_scope(finding)
-        if new_coverage is not None and new_coverage.covered(
+        if comparable and new_coverage is not None and new_coverage.covered(
             finding.get("module", ""), finding.get("id", ""), account, region
         ):
             resolved.append(finding)
