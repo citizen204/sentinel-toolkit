@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0", "moto>=5.0", "scapy>=2.5", "ruff>=0.6"]
+dev = ["pytest>=9.1.1", "moto>=5.0", "scapy>=2.5", "ruff>=0.6"]
 capture = ["scapy>=2.5"]  # optional: live/pcap capture for netmon
 
 [tool.ruff]
