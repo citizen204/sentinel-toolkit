@@ -239,18 +239,23 @@ Rules that correspond to a **CIS AWS Foundations Benchmark** control carry the c
 
 ```console
 $ sentinel rules
-CLOUD-IAM-EFFECTIVE-ADMIN  [High/Access Control]    ...  (CIS-AWS-1.4.0:1.16)
-CLOUD-RDS-UNENCRYPTED      [High/Data Protection]   ...  (CIS-AWS-3.0.0:2.3.1)
-CLOUD-S3-NO-BPA            [Medium/Data Exposure]   ...  (CIS-AWS-3.0.0:2.1.4)
-CLOUD-SG-OPEN-INGRESS      [High/Network Exposure]  ...  (CIS-AWS-3.0.0:5.2, CIS-AWS-3.0.0:5.3)
+CLOUD-IAM-CUSTOM-POLICY-ADMIN  [High/Access Control]    ...  (CIS-AWS-1.4.0:1.16)
+CLOUD-RDS-UNENCRYPTED          [High/Data Protection]   ...  (CIS-AWS-3.0.0:2.3.1)
+CLOUD-S3-BPA-NOT-STRICT        [Low/Data Exposure]      ...  (CIS-AWS-3.0.0:2.1.4)
+CLOUD-SG-OPEN-INGRESS          [High/Network Exposure]  ...  (CIS-AWS-3.0.0:5.2, CIS-AWS-3.0.0:5.3)
 ```
 
-Only **4 of 16** cloud rules are mapped, and that number is deliberate. Every id is traced to
+Only **4 of 18** cloud rules are mapped, and that number is deliberate. Every id is traced to
 AWS Security Hub's published CIS control table — none are recalled from memory, because a
-plausible-looking wrong control id is worse than no mapping at all. The rules that *look* like
-they should map but don't, and the benchmark controls Sentinel doesn't yet cover, are both
-listed in **[docs/compliance.md](docs/compliance.md)**. Sentinel is not a certified CIS
-assessment tool.
+plausible-looking wrong control id is worse than no mapping at all.
+
+Note what is *not* in that list. `CLOUD-IAM-EFFECTIVE-ADMIN` and `CLOUD-S3-NO-BPA` carried
+these mappings until v0.2.0, and both were wrong: IAM.1 evaluates only customer managed
+policies, and CIS 2.1.4 requires the account *and* bucket level to pass. The ids were real and
+correctly transcribed — the rules just didn't test what the controls test. The rules that
+*look* like they should map but don't, the deviations that remain inside the mapped ones, and
+the benchmark controls Sentinel doesn't cover are all in
+**[docs/compliance.md](docs/compliance.md)**. Sentinel is not a certified CIS assessment tool.
 
 ## 📊 Dashboard
 

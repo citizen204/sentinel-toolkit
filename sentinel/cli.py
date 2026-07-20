@@ -119,14 +119,26 @@ EXIT_FINDINGS = 2
 EXIT_INCOMPLETE = 3
 
 
-def _gate(findings, coverage, fail_on, fail_on_incomplete) -> int:
-    """Decide the process exit code. 0 unless a gate was asked for and tripped."""
+def _gate(findings, coverage, fail_on, fail_on_incomplete, selected=None) -> int:
+    """Decide the process exit code. 0 unless a gate was asked for and tripped.
+
+    `selected` is the set of scanners this run was asked to execute. The gate only
+    judges those: a scanner the operator deliberately excluded is recorded as
+    skipped in the report, but excluding it is not an incomplete scan. Judging every
+    registered scanner made `--include webscan --fail-on-incomplete` fail on a run
+    that did exactly what it was told.
+    """
     if fail_on_incomplete:
+        statuses = coverage.scanner_statuses()
+        in_scope = {
+            name: status for name, status in statuses.items()
+            if selected is None or name in selected
+        }
         not_ok = sorted(
-            name for name, status in coverage.scanner_statuses().items()
+            name for name, status in in_scope.items()
             if status is not CoverageStatus.OK
         )
-        if not_ok or not coverage.units:
+        if not_ok or not in_scope:
             detail = ", ".join(not_ok) if not_ok else "nothing was covered"
             typer.echo(f"Incomplete scan coverage: {detail}.")
             return EXIT_INCOMPLETE
@@ -343,7 +355,7 @@ def scan_all(
     _emit_reports(
         findings, output_dir or cfg.output_dir, fmt, build_envelope(cfg, coverage)
     )
-    code = _gate(findings, coverage, fail_on, fail_on_incomplete)
+    code = _gate(findings, coverage, fail_on, fail_on_incomplete, set(selected))
     if code:
         raise typer.Exit(code=code)
 
@@ -357,6 +369,14 @@ def scan(
     ),
     output_dir: str = typer.Option(
         None, "--output-dir", help="Report output dir (default: config output_dir)."
+    ),
+    fail_on: Severity = typer.Option(
+        None, "--fail-on",
+        help="Exit non-zero if any open finding is at or above this severity.",
+    ),
+    fail_on_incomplete: bool = typer.Option(
+        False, "--fail-on-incomplete",
+        help="Exit non-zero if this scanner did not run to completion.",
     ),
 ) -> None:
     """Run a single named scanner and write its report."""
@@ -375,6 +395,10 @@ def scan(
     _emit_reports(
         findings, output_dir or cfg.output_dir, fmt, build_envelope(cfg, coverage)
     )
+    # Gated on this scanner alone; the others were never asked to run.
+    code = _gate(findings, coverage, fail_on, fail_on_incomplete, {name})
+    if code:
+        raise typer.Exit(code=code)
 
 
 _SAMPLE_CONFIG = """\
